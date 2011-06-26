@@ -1,7 +1,6 @@
-#include <WinSock2.h>
-//#include <WinError.h>
+#include "wsa_strerror.h"
 
-char *wsa_strerror(int e) {
+const char *wsa_strerror(int e) {
 	switch (e) {
 	case WSA_INVALID_HANDLE: // 6
 		return "Specified event object handle is invalid.";

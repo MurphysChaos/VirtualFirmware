@@ -32,19 +32,18 @@ void FormatSockaddr(struct sockaddr* sa, char* string, int length) {
   struct sockaddr_in6* sin6;
 
   switch(sa->sa_family) {
-  case AF_UNSPEC:
   case AF_INET:
     sin = (struct sockaddr_in*) sa;
-    inet_ntop(sin->sin_family, &(sin->sin_addr), buf, NI_MAXHOST);
+    inet_ntop(AF_INET, &(sin->sin_addr), buf, NI_MAXHOST);
     snprintf(string, length, "%s:%d", buf, ntohs(sin->sin_port));
     break;
   case AF_INET6:
-    // struct sockaddr_in6
     sin6 = (struct sockaddr_in6 *) sa;
-    inet_ntop(sin6->sin6_family, &(sin6->sin6_addr), buf, NI_MAXHOST);
+    inet_ntop(AF_INET6, &(sin6->sin6_addr), buf, NI_MAXHOST);
     snprintf(string, length, "%s/%d", buf, ntohs(sin6->sin6_port));
     break;
   default:
+    memset(string, 0, length);
     break;
   }
 }
@@ -215,7 +214,7 @@ int PanelAcceptConnection(PANEL* p) {
   int rc = 0;
   
   n_socket = accept(p->socket, &addr, &addrlen);
-  if(!n_socket) {
+  if(n_socket == INVALID_SOCKET) {
     fprintf(stderr, "failed to accept incoming connection. %s\n", sock_error());
     return SOCKET_ERROR;
   }

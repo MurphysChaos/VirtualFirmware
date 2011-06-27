@@ -23,11 +23,8 @@ extern "C" {
  * * * */
 typedef struct panel {
 	uint32_t		sp_socket;
-	char			*sp_ibuf;
-	char			*sp_obuf;
 	struct addrinfo	*sp_iface;
 	struct addrinfo *sp_bind;
-	uint32_t		sp_af;
 } PANEL;
 
 /* "New" functions create a new panel and return a pointer to it. "Make" functions
@@ -38,8 +35,10 @@ PANEL *GetEmptyPanel();
 PANEL *GetNewPanel(char *addr, char *port, int af, int type, int proto);
 PANEL *GetNewPanelWithSocket(int s, struct sockaddr *addr);
 void FreePanel(PANEL *p);
-int MakeMulticast(PANEL *p, int ttl);
+int MakeMulticast(PANEL *p);
+int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr);
 int SetMulticastTTL(PANEL *p, int ttl);
+int SetMulticastLoopback(PANEL *p, int loopval);
 void PrintPanel(PANEL *p);
 void PrintAddrinfo(struct addrinfo *ai);
 void PrintSockaddr(FILE* f, struct sockaddr *sa);

@@ -1,3 +1,53 @@
 Virtual Firmware API for Pre-Silicon Driver Development
-
 Published under the GNU Public License v2.
+
+About the Project 
+================= 
+
+Virtual Firmware (hereafter referred to as "the Project") is a project, in
+cooperation with Intel Corporation, under the Software Engineering Capstone
+program at Portland State University.  Its purpose is to build a set of
+tools for simulating a hardware environment to allow driver developers to
+test their drivers without "working silicon."
+
+The particular project with Intel involves communicating between a driver
+and a firmware.
+
+
+Components of the Project
+=========================
+
+We are working with QEMU-KVM to create two running virtual machines. On the
+first virtual machine (VM) is an emulator running the ThreadX RTOS with a
+proprietary firmware created by Intel (this component is not available on
+the public domain).  The second VM is running Fedora 14 Linux with a
+modified Intel e1000 driver and virtual hardware component.
+
+Between the two VMs is a sockets library, allowing for metacommunication
+between the driver and firmware, outside the normal communications chain for
+QEMU networking.
+
+
+About the Software Engineering Capstone
+=======================================
+
+Portland State University (PSU) operates non-traditional requirements for
+the general education requirements of an accredited university. Part of that
+requirement is a "Senior Capstone" where the members of a team work with the
+community on a significant project. Numerous capstones, representing varied
+disciplines, exist, one of which is a Software Engineering capstone.
+
+The Software Engineering capstone takes the form of building a software
+product with a team for sponsors in the local area. The overall project is
+meant to approximate the working conditions of working for a "customer,"
+gathering requirements, building a specification, research, design, coding,
+distribution, etc.
+
+
+Members of the Project Team
+===========================
+Kabiru "Kaybee" Ahmed
+Ahmed Bohliqa
+Jacob Keller
+Joel Murphy
+Cuong Nguen

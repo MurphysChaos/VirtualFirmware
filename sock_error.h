@@ -5,6 +5,7 @@
 #include "wsa_strerror.h"
 #else
 #include <errno.h>
+#include <string.h>
 #endif
 
 #ifdef _cplusplus

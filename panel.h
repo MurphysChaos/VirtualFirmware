@@ -13,6 +13,10 @@ extern "C" {
 
 #define SP_BUFSIZE 1024					// Allows 1kb + 1 null.
 
+#ifndef SOCKET_ERROR
+#define SOCKET_ERROR (~0)
+#endif
+
 /* Functions in this library are intended to take a pointer to a panel struct 
  * and any options as arguments. Functions that take something else are helper
  * functions, not intended to be called by the user.
@@ -38,7 +42,7 @@ int MakeMulticast(PANEL *p, int ttl);
 int SetMulticastTTL(PANEL *p, int ttl);
 void PrintPanel(PANEL *p);
 void PrintAddrinfo(struct addrinfo *ai);
-void PrintSockaddr(struct sockaddr *sa);
+void PrintSockaddr(FILE* f, struct sockaddr *sa);
 
 #ifdef _cplusplus
 }

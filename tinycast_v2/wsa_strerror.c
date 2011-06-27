@@ -1,4 +1,5 @@
 #include "wsa_strerror.h"
+#ifdef _WIN32
 
 const char *wsa_strerror(int e) {
 	switch (e) {
@@ -290,3 +291,9 @@ const char *wsa_strerror(int e) {
 	}
 	return NULL;
 }
+#else
+
+const char* wsa_strerror(int e) {
+  return "";
+}
+#endif

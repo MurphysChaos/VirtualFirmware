@@ -5,13 +5,18 @@
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <stdlib.h>
 #include <netdb.h>
 #include <errno.h>
 #endif
 #include <stdint.h>
 #include <stdio.h>
 #include "panel.h"
-#include "wsa_strerror.h"
+#include "sock_error.h"
+
+#ifndef _WIN32
+#define Sleep(x) usleep(1000*x)
+#endif
 
 #define UDP_ADDR "239.1.1.10"	// Locally-scoped IPv4 multicast (same subnet)
 #define UDP_PORT "9751"			// IANA unassigned port
@@ -79,38 +84,40 @@ int main(int argc, char **argv) {
 
 		for (i=1;i<20;i++) {
 			rc = sendto(p1->sp_socket, (char *) &hsp, sizeof (hsp), 0, p1->sp_iface->ai_addr, p1->sp_iface->ai_addrlen);
-			if (rc == SOCKET_ERROR) {
-				fprintf(stderr, "Failed to send to multicast address. %s\n", wsa_strerror(WSAGetLastError()));
+			if (rc < 0) {
+				fprintf(stderr, "Failed to send to multicast address. %s\n", sock_error());
 				goto cleanup;
 			}
 			printf("Sent handshake packet to ");
-			PrintSockaddr(p1->sp_iface->ai_addr);
+			PrintSockaddr(stdout, p1->sp_iface->ai_addr);
 			printf("\n");
+			printf("[%d]:%d\n", hsp.port, hsp.magic);
+			Sleep(1000);
 		}
 
-		Sleep(1000);
 	} else {
 		struct sockaddr fromaddr;
 		int				fromlen;
 
 		for (i=1;i<20;i++) {
 			fromlen = sizeof (fromaddr);
-			rc = recvfrom(p1->sp_socket, (char *) p1->sp_iface, SP_BUFSIZE, 0, &fromaddr, &fromlen);
-			if (rc == SOCKET_ERROR) {
-				fprintf(stderr, "Failed to receive multicast packet. %s\n", wsa_strerror(WSAGetLastError()));
+			rc = recvfrom(p1->sp_socket, (char *) &hsp, sizeof(HSPACKET), 0, &fromaddr, &fromlen);
+			if (rc < 0) {
+				fprintf(stderr, "Failed to receive multicast packet. %s\n", sock_error());
 				goto cleanup;
 			}
-			hsp.magic = ntohl(((HSPACKET *) (p1->sp_ibuf))->magic);
-			hsp.port = ntohs(((HSPACKET *) (p1->sp_ibuf))->port);
+			hsp.magic = ntohl(hsp.magic);
+			hsp.port = ntohs(hsp.port);
 
 			if (hsp.magic == HS_MAGICNUM) {
 				printf("Handshake packet received from ");
-				PrintSockaddr(&fromaddr);
+				PrintSockaddr(stdout, &fromaddr);
 				printf(". Server listening on port %u.\n", hsp.port);
 			} else {
 				printf("Packet received from ");
-				PrintSockaddr(&fromaddr);
+				PrintSockaddr(stdout, &fromaddr);
 				printf(". Not recognized as handshake.\n");
+				printf("[%d]:%d\n", hsp.port, hsp.magic);
 			}
 		}
 	}

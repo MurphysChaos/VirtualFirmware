@@ -349,6 +349,9 @@ void PrintAddrinfo(struct addrinfo *ai) {
 			case IPPROTO_IPV6:
 				printf(", Protocol: IPPROTO_IPV6");
 				break;
+			case IPPROTO_TCP:
+				printf(", Protocol: IPPROTO_TCP");
+				break;
 			case IPPROTO_UDP:
 				printf(", Protocol: IPPROTO_UDP");
 				break;

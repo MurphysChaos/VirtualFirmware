@@ -49,6 +49,7 @@ void ProcessArgs(int argc, char **argv)
 int main(int argc, char **argv) {
 	PANEL *p1 = NULL, *p2 = NULL;
 	size_t ps = sizeof (PANEL);
+	char obuf[SP_BUFSIZE], ibuf[SP_BUFSIZE];
 	HSPACKET hsp;
 	int rc, i;
 
@@ -66,19 +67,22 @@ int main(int argc, char **argv) {
 
 	p1 = GetNewPanel(UDP_ADDR,UDP_PORT,AF_INET,SOCK_DGRAM,IPPROTO_UDP);
 	if (p1) {
-		MakeMulticast(p1, UDP_TTL);
-		PrintPanel(p1);
+		MakeMulticast(p1);
+		SetMulticastTTL(p1, UDP_TTL);
+		SetMulticastLoopback(p1, 1);
+		printf("Socket promoted to multicast.\n");
 	} else {
 		fprintf(stderr, "Multicast socket creation failed. Exiting.");
 		goto cleanup;
 	}
 
 	if (bIsServer) {
-		hsp.magic = htonl(HS_MAGICNUM);
-		hsp.port = htons(atoi(TCP_PORT));
-
 		for (i=1;i<20;i++) {
-			rc = sendto(p1->sp_socket, (char *) &hsp, sizeof (hsp), 0, p1->sp_iface->ai_addr, p1->sp_iface->ai_addrlen);
+			hsp.magic = htonl(HS_MAGICNUM);
+			hsp.port = htons(atoi(TCP_PORT));
+			memcpy(obuf, &hsp, sizeof (hsp));
+
+			rc = sendto(p1->sp_socket, obuf, sizeof (obuf), 0, p1->sp_iface->ai_addr, p1->sp_iface->ai_addrlen);
 			if (rc == SOCKET_ERROR) {
 				fprintf(stderr, "Failed to send to multicast address. %s\n", wsa_strerror(WSAGetLastError()));
 				goto cleanup;
@@ -86,27 +90,28 @@ int main(int argc, char **argv) {
 			printf("Sent handshake packet to ");
 			PrintSockaddr(p1->sp_iface->ai_addr);
 			printf("\n");
+			
+			Sleep(1000);
 		}
-
-		Sleep(1000);
 	} else {
 		struct sockaddr fromaddr;
 		int				fromlen;
 
 		for (i=1;i<20;i++) {
 			fromlen = sizeof (fromaddr);
-			rc = recvfrom(p1->sp_socket, (char *) p1->sp_iface, SP_BUFSIZE, 0, &fromaddr, &fromlen);
+			rc = recvfrom(p1->sp_socket, ibuf, SP_BUFSIZE, 0, &fromaddr, &fromlen);
 			if (rc == SOCKET_ERROR) {
 				fprintf(stderr, "Failed to receive multicast packet. %s\n", wsa_strerror(WSAGetLastError()));
 				goto cleanup;
 			}
-			hsp.magic = ntohl(((HSPACKET *) (p1->sp_ibuf))->magic);
-			hsp.port = ntohs(((HSPACKET *) (p1->sp_ibuf))->port);
+			memcpy(&hsp, ibuf, sizeof (hsp));
+			hsp.magic = ntohl(hsp.magic);;
+			hsp.port = ntohs(hsp.port);
 
 			if (hsp.magic == HS_MAGICNUM) {
 				printf("Handshake packet received from ");
 				PrintSockaddr(&fromaddr);
-				printf(". Server listening on port %u.\n", hsp.port);
+ 				printf(". Server listening on port %u.\n", hsp.port);
 			} else {
 				printf("Packet received from ");
 				PrintSockaddr(&fromaddr);

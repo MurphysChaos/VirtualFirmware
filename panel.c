@@ -28,16 +28,6 @@ PANEL *GetEmptyPanel() {
 		return NULL;
 	}
 	memset(p, 0, ps);
-	p->sp_ibuf = (char *) malloc(SP_BUFSIZE);
-	if (p->sp_ibuf == NULL) {
-		fprintf(stderr, "Failed to allocate memory for input buffer.\n");
-		return NULL;
-	}
-	p->sp_obuf = (char *) malloc(SP_BUFSIZE);
-	if (p->sp_ibuf == NULL) {
-		fprintf(stderr, "Failed to allocate memory for output buffer.\n");
-		return NULL;
-	}
 
 	return p;
 }
@@ -55,10 +45,10 @@ PANEL *GetNewPanel(char *addr, char *port, int af, int type, int proto) {
 
 	// Resolve destination address
 	hints.ai_flags = 0;
-	hints.ai_family = ((addr) ? af : AF_UNSPEC);
+	hints.ai_family = af;
 	hints.ai_socktype = type;
 	hints.ai_protocol = proto;
-	rc = getaddrinfo(addr, "0", &hints, &(p->sp_iface));
+	rc = getaddrinfo(addr, port, &hints, &(p->sp_iface));
 	if(rc != 0) {
 		fprintf(stderr, "Failed to resolve remote address. %s\n", wsa_strerror(WSAGetLastError()));
 		FreePanel(p);
@@ -67,11 +57,12 @@ PANEL *GetNewPanel(char *addr, char *port, int af, int type, int proto) {
 		PrintAddrinfo(p->sp_iface);
 	}
 
-	hints.ai_flags = ((addr) ? AI_PASSIVE : 0);
-	hints.ai_family = ((addr) ? af : AF_UNSPEC);
+	// Resolve binding address
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_family = af;
 	hints.ai_socktype = type;
 	hints.ai_protocol = proto;
-	rc = getaddrinfo(INADDR_ANY, port, &hints, &(p->sp_bind));
+	rc = getaddrinfo(NULL, port, &hints, &(p->sp_bind));
 	if(rc != 0) {
 		fprintf(stderr, "Failed to resolve host address. %s\n", wsa_strerror(WSAGetLastError()));
 		FreePanel(p);
@@ -79,9 +70,6 @@ PANEL *GetNewPanel(char *addr, char *port, int af, int type, int proto) {
 	} else {
 		PrintAddrinfo(p->sp_bind);
 	}
-
-	// Save "intended" address family.
-	p->sp_af = af;
 
 	// Create the socket.
 	p->sp_socket = socket(af, type, proto);
@@ -99,7 +87,7 @@ PANEL *GetNewPanel(char *addr, char *port, int af, int type, int proto) {
 	}
 
 	// Bind the socket
-	rc = bind(p->sp_socket, (p->sp_bind->ai_addr), sizeof (p->sp_bind->ai_addr));
+	rc = bind(p->sp_socket, (p->sp_bind->ai_addr), sizeof *(p->sp_bind->ai_addr));
 	if (rc == SOCKET_ERROR) {
 		fprintf(stderr, "Unable to bind socket to ");
 		PrintSockaddr(p->sp_bind->ai_addr);
@@ -130,7 +118,7 @@ PANEL *GetNewPanelWithSocket(int s, struct sockaddr *addr) {
 		struct sockaddr_in *sin = (struct sockaddr_in *) addr;
 		char addr_s[INET_ADDRSTRLEN];
 		inet_ntop(addr->sa_family, &(sin->sin_addr), addr_s, INET_ADDRSTRLEN);
-		itoa(sin->sin_port, port, 6);
+		sprintf(port, "%u", sin->sin_port);
 		rc = getaddrinfo(addr_s, port, &hints, &(p->sp_iface));
 		if (rc == SOCKET_ERROR) {
 			fprintf(stderr, "Failed to convert socket to IPv4 panel. %s\n", wsa_strerror(WSAGetLastError()));
@@ -141,7 +129,7 @@ PANEL *GetNewPanelWithSocket(int s, struct sockaddr *addr) {
 		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) addr;
 		char addr_s[INET6_ADDRSTRLEN];
 		inet_ntop(addr->sa_family, &(sin6->sin6_addr), addr_s, INET6_ADDRSTRLEN);
-		itoa(sin6->sin6_port, port, 6);
+		sprintf(port, "%u", sin6->sin6_port);
 		rc = getaddrinfo(addr_s, port, &hints, &(p->sp_iface));
 		if (rc == SOCKET_ERROR) {
 			fprintf(stderr, "Failed to convert socket to IPv6 panel. %s\n", wsa_strerror(WSAGetLastError()));
@@ -168,14 +156,6 @@ void FreePanel(PANEL *p) {
 			freeaddrinfo(p->sp_bind);
 			p->sp_bind = NULL;
 		}
-		if(p->sp_ibuf) {
-			free(p->sp_ibuf);
-			p->sp_ibuf = NULL;
-		}
-		if(p->sp_obuf) {
-			free(p->sp_obuf);
-			p->sp_obuf = NULL;
-		}
 		free(p);
 	}
 	p = NULL;
@@ -184,19 +164,19 @@ void FreePanel(PANEL *p) {
 /* Make an existing panel into a multicast panel by joining the multicast group
  * and setting the send interface.
  * * * */ 
-int MakeMulticast(PANEL *p, int ttl) {
+int MakeMulticast(PANEL *p) {
 	struct ip_mreq		mreq;
 	struct ipv6_mreq	mreq6;
 	struct sockaddr		*sa = (p->sp_iface->ai_addr);
 	struct sockaddr_in	*sin = (struct sockaddr_in *) sa;
 	struct sockaddr_in6	*sin6 = (struct sockaddr_in6 *) sa;
 	int		level, 
-			mc_opt, si_opt, 
-			mc_len, si_len;
-	char	*mc_val, *si_val;
+			mc_opt, 
+			mc_len;
+	char	*mc_val;
 	int		rc;
 
-	if (p->sp_af == AF_INET) {
+	if (p->sp_iface->ai_family == AF_INET) {
 		level = IPPROTO_IP;
 		// IPv4 multicast membership parameters
 		mc_opt = IP_ADD_MEMBERSHIP;
@@ -204,12 +184,8 @@ int MakeMulticast(PANEL *p, int ttl) {
 		mc_len = sizeof (mreq);
 		mreq.imr_multiaddr.s_addr = sin->sin_addr.s_addr;
 		mreq.imr_interface.s_addr = INADDR_ANY;
-		// IPv4 send interface parameters
-		si_opt = IP_MULTICAST_IF;
-		si_val = (char *) &(sin->sin_addr.s_addr);
-		si_len = sizeof (sin->sin_addr.s_addr);
 		// IPv4 multicast TTL
-	} else if (p->sp_af == AF_INET6) {
+	} else if (p->sp_iface->ai_family == AF_INET6) {
 		level = IPPROTO_IPV6;
 		// IPv6 multicast membership parameters
 		mc_opt = IPV6_ADD_MEMBERSHIP;
@@ -220,19 +196,41 @@ int MakeMulticast(PANEL *p, int ttl) {
 #endif
 		mreq6.ipv6mr_multiaddr = sin6->sin6_addr;
 		mreq6.ipv6mr_interface = sin6->sin6_scope_id;
-		// IPv6 send interface parameters
-		si_opt = IPV6_MULTICAST_IF;
-		si_val = (char *) &(sin6->sin6_scope_id);
-		si_len = sizeof (sin6->sin6_scope_id);
 		// IPv6 multicast TTL
 	} else {
 		fprintf(stderr, "Invalid address family to join multicast group.\n");
 		return SOCKET_ERROR;
 	}
 
+	// Join multicast group
 	rc = setsockopt(p->sp_socket, level, mc_opt, mc_val, mc_len);
 	if (rc == SOCKET_ERROR) {
 		fprintf(stderr, "Failed to join multicast group. %s\n", wsa_strerror(WSAGetLastError()));
+		return SOCKET_ERROR;
+	}
+
+	return rc;
+}
+
+int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr) {
+	int		level, 
+			si_opt, 
+			si_len;
+	char	*si_val;
+	int		rc;
+
+	// IPv4 send interface parameters
+	if (addr->sa_family == AF_INET) {
+		si_opt = IP_MULTICAST_IF;
+		si_val = (char *) &((struct sockaddr_in *) addr)->sin_addr.s_addr;
+		si_len = sizeof (((struct sockaddr_in *) addr)->sin_addr.s_addr);
+	} else if (addr->sa_family == AF_INET6) {
+		// IPv6 send interface parameters
+		si_opt = IPV6_MULTICAST_IF;
+		si_val = (char *) ((struct sockaddr_in6 *) addr)->sin6_scope_id;
+		si_len = sizeof (((struct sockaddr_in6 *) addr)->sin6_scope_id);
+	} else {
+		fprintf(stderr, "Invalid address family to set send interface.\n");
 		return SOCKET_ERROR;
 	}
 	rc = setsockopt(p->sp_socket, level, si_opt, si_val, si_len);
@@ -240,8 +238,6 @@ int MakeMulticast(PANEL *p, int ttl) {
 		fprintf(stderr, "Failed to set multicast send interface. %s\n", wsa_strerror(WSAGetLastError()));
 		return SOCKET_ERROR;
 	}
-	
-	return SetMulticastTTL(p,ttl);
 }
 
 /* Set the time-to-live (TTL) value for a multicast panel.
@@ -251,10 +247,10 @@ int SetMulticastTTL(PANEL *p, int ttl) {
 	char	*ttl_val;
 	int		rc;
 
-	if (p->sp_af == AF_INET) {
+	if (p->sp_iface->ai_family == AF_INET) {
 		level = IPPROTO_IP;
 		ttl_opt = IP_MULTICAST_TTL;
-	} else if (p->sp_af == AF_INET6) {
+	} else if (p->sp_iface->ai_family == AF_INET6) {
 		level = IPPROTO_IPV6;
 		ttl_opt = IPV6_MULTICAST_HOPS;
 	} else {
@@ -273,6 +269,47 @@ int SetMulticastTTL(PANEL *p, int ttl) {
 	return 0;
 }
 
+int SetMulticastLoopback(PANEL *p, int loopval)
+{
+    char *optval=NULL;
+    int   optlevel = 0,
+          option = 0,
+          optlen = 0,
+          rc;
+
+    rc = NO_ERROR;
+	if (p->sp_iface->ai_family == AF_INET)
+    {
+        // Set the v4 options
+        optlevel = IPPROTO_IP;
+        option   = IP_MULTICAST_LOOP;
+        optval   = (char *) &loopval;
+        optlen   = sizeof(loopval);
+    }
+    else if (p->sp_iface->ai_family == AF_INET6)
+    {
+        // Set the v6 options
+        optlevel = IPPROTO_IPV6;
+        option   = IPV6_MULTICAST_LOOP;
+        optval   = (char *) &loopval;
+        optlen   = sizeof(loopval);
+    }
+    else
+    {
+        fprintf(stderr, "Invalid address family for multicast loopback.\n");
+        rc = SOCKET_ERROR;
+    }
+    if (rc != SOCKET_ERROR)
+    {
+        // Set the multpoint loopback
+		rc = setsockopt(p->sp_socket,optlevel,option,optval,optlen);
+        if (rc == SOCKET_ERROR)
+        {
+            fprintf(stderr, "SetMulticastLoopBack: setsockopt failed. %s\n", wsa_strerror(WSAGetLastError()));
+        }
+    }
+    return rc;
+}
 /* Displays information on a panel to stdout.
  * * * */
 void PrintPanel(PANEL *p) {

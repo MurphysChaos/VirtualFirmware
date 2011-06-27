@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
   PANEL* p = NULL;
   HSPACKET hsp;
   int rc, i;
+  char addressName[NI_MAXHOST];
   
 #ifdef _WIN32
   // Load Winsock
@@ -68,13 +69,14 @@ int main(int argc, char **argv) {
     hsp.magic = htonl(HS_MAGICNUM);
     hsp.port = htons(atoi(TCP_PORT));
 
-    for(i = 1; i < 20; i++) {
+    for(i = 0; i < 20; i++) {
       rc = PanelSendData(p, &hsp, sizeof(hsp));
       if(rc < 0) {
 	fprintf(stderr, "Failed to send requested data.\n");
 	goto cleanup;
       } else {
-	printf("sent handshake packet #%d\n", i);
+	FormatSockaddr(p->destination->r_addr->ai_addr, addressName, NI_MAXHOST);
+	printf("sent handshake packet #%d to %s\n", i, addressName);
       }
       
       Sleep(1000);
@@ -110,7 +112,8 @@ int main(int argc, char **argv) {
       hsp.port = ntohs(hsp.port);
 
       if(hsp.magic == HS_MAGICNUM) {
-	printf("Handshake packet received\n");
+	FormatSockaddr(&fromaddr, addressName, NI_MAXHOST);
+	printf("Handshake packet received from %s\n", addressName);
 	printf("Server listening on port %d\n", hsp.port);
       } else {
 	printf("Packet recieved\n");

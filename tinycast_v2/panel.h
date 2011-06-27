@@ -80,6 +80,10 @@ typedef struct panel {
   struct addrinfo* r_source;
 } PANEL;
 
+// Some useful helper functions
+struct addrinfo* ResolveAddress(char* addr, char* port, int family, int type, int protocol);
+void FormatSockaddr(struct sockaddr* sa, char* string, int length);
+
 /*
  * PanelCreate()
  *

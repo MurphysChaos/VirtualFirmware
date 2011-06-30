@@ -60,11 +60,20 @@ void ProcessArgs(int argc, char **argv)
 }
 
 int main(int argc, char **argv) {
-	PANEL *p1 = NULL, *p2 = NULL;
-	size_t ps = sizeof (PANEL);
-	char obuf[SP_BUFSIZE], ibuf[SP_BUFSIZE];
-	HSPACKET hsp;
-	int rc, i;
+	PANEL			*p1 = NULL,
+					*p2 = NULL,
+					*p3 = NULL;
+	struct sockaddr	fromaddr;
+	int				fromlen,
+					fromsock = INVALID_SOCKET;
+	fd_set			readfds;
+	struct timeval	tv;
+	size_t			ps = sizeof (PANEL);
+	char			obuf[SP_BUFSIZE], 
+					ibuf[SP_BUFSIZE];
+	HSPACKET		hsp;
+	int				rc, 
+					i;
 
 #ifdef _WIN32
     // Load Winsock
@@ -90,48 +99,113 @@ int main(int argc, char **argv) {
 	}
 
 	if (bIsServer) {
-		for (i=1;i<20;i++) {
+		// Prepare to accept connections.
+		p2 = GetNewPanel(INADDR_ANY,TCP_PORT,AF_INET,SOCK_STREAM,IPPROTO_TCP);
+		rc = listen(p2->sp_socket, 1);
+		if (rc == SOCKET_ERROR) {
+			fprintf(stderr, "Failed to begin listening for new connections. %s\n", sock_error());
+			goto cleanup;
+		}
+		// Announce until we detect a connection
+		while (fromsock == INVALID_SOCKET) {
+			// Build outgoing datagram
 			hsp.magic = htonl(HS_MAGICNUM);
 			hsp.port = htons(atoi(TCP_PORT));
 			memcpy(obuf, &hsp, sizeof (hsp));
 
+			// Sending datagram
 			rc = sendto(p1->sp_socket, obuf, sizeof (obuf), 0, p1->sp_iface->ai_addr, p1->sp_iface->ai_addrlen);
 			if (rc == SOCKET_ERROR) {
 				fprintf(stderr, "Failed to send to multicast address. %s\n", sock_error());
 				goto cleanup;
 			}
-			printf("Sent handshake packet to ");
+			printf("Sent handshake packets to ");
 			PrintSockaddr(stdout, p1->sp_iface->ai_addr);
 			printf("\n");
-			
-			Sleep(1000);
-		}
-	} else {
-		struct sockaddr fromaddr;
-		int				fromlen;
 
-		for (i=1;i<20;i++) {
-			fromlen = sizeof (fromaddr);
-			rc = recvfrom(p1->sp_socket, ibuf, SP_BUFSIZE, 0, &fromaddr, &fromlen);
-			if (rc == SOCKET_ERROR) {
-				fprintf(stderr, "Failed to receive multicast packet. %s\n", sock_error());
+			// Preparing to receive incoming TCP connection
+			FD_ZERO(&readfds);
+			FD_SET(p2->sp_socket, &readfds);
+
+			tv.tv_sec = 0;
+			tv.tv_usec = 500000;
+			rc = select(p2->sp_socket + 1, &readfds, NULL, NULL, &tv);
+
+			if (rc == -1) {
+				fprintf(stderr, "Error in select(). %s\n", sock_error());
 				goto cleanup;
-			}
-			memcpy(&hsp, ibuf, sizeof (hsp));
-			hsp.magic = ntohl(hsp.magic);;
-			hsp.port = ntohs(hsp.port);
-
-			if (hsp.magic == HS_MAGICNUM) {
-				printf("Handshake packet received from ");
-				PrintSockaddr(&fromaddr);
- 				printf(". Server listening on port %u.\n", hsp.port);
+			} else if (rc == 0) {
+				// No triggered events. Nothing to do.
 			} else {
-				printf("Packet received from ");
+				// Connect request from client
+				fromlen = sizeof fromaddr;
+				fromsock = accept(p2->sp_socket, &fromaddr, &fromlen);
+				printf("Connection established with client at ");
 				PrintSockaddr(stdout, &fromaddr);
-				printf(". Not recognized as handshake.\n");
-				printf("[%d]:%d\n", hsp.port, hsp.magic);
+				printf("\n");
+				break;
 			}
 		}
+
+		// Connection established. Receive some data.
+		rc = recv(fromsock, ibuf, SP_BUFSIZE, 0);
+		if (rc == SOCKET_ERROR) {
+			fprintf(stderr, "Failed to receive usable data. %s\n", sock_error());
+			goto cleanup;
+		}
+		printf("Received %u bytes from ", SP_BUFSIZE);
+		PrintSockaddr(stdout, &fromaddr);
+		printf("\n");
+	} else {
+		p2 = GetNewPanel(INADDR_ANY,"0",AF_INET,SOCK_STREAM,IPPROTO_TCP);
+		fromlen = sizeof (fromaddr);
+		// Wait for announcement
+		rc = recvfrom(p1->sp_socket, ibuf, SP_BUFSIZE, 0, &fromaddr, &fromlen);
+		if (rc == SOCKET_ERROR) {
+			fprintf(stderr, "Failed to receive multicast packet. %s\n", sock_error());
+			goto cleanup;
+		}
+		// Extract handshake
+		memcpy(&hsp, ibuf, sizeof (hsp));
+		hsp.magic = ntohl(hsp.magic);;
+		hsp.port = ntohs(hsp.port);
+		
+		if (hsp.magic == HS_MAGICNUM) {
+			// Valid handshake received, connect to server
+			printf("Handshake packet received from ");
+			PrintSockaddr(stdout, &fromaddr);
+ 			printf(". Server listening on port %u.\n", hsp.port);
+			// Alter address to match target.
+			((struct sockaddr_in *) &fromaddr)->sin_port = htons(hsp.port);
+			rc = connect(p2->sp_socket, &fromaddr, fromlen);
+			if (rc == SOCKET_ERROR) {
+				fprintf(stderr, "Failed to connect to ");
+				PrintSockaddr(stdout, &fromaddr);
+				fprintf(stderr, "\n");
+			} else {
+				printf("Connection established with server at ");
+				PrintSockaddr(stdout, &fromaddr);
+				printf("\n");
+			}
+		} else {
+			// Invalid handshake received. Just a test program so quit.
+			printf("Packet received from ");
+			PrintSockaddr(stdout, &fromaddr);
+			printf(". Not recognized as handshake.\n");
+			goto cleanup;
+		}
+
+		memset(obuf, '~', SP_BUFSIZE);
+		rc = send(p2->sp_socket, obuf, SP_BUFSIZE, 0);
+		if (rc == SOCKET_ERROR) {
+			fprintf(stderr, "Failed to send %u bytes to ", SP_BUFSIZE);
+			PrintSockaddr(stdout, &fromaddr);
+			fprintf(stderr, ". %s\n", sock_error());
+			goto cleanup;
+		}
+		printf("Sent %u bytes to ", SP_BUFSIZE);
+		PrintSockaddr(stdout, &fromaddr);
+		printf("\n");
 	}
 
 cleanup:

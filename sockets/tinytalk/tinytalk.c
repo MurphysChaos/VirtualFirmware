@@ -1,7 +1,15 @@
+/* tinytalk -- A small test program to evaluate the effectiveness of panel.c 
+ * and panel.h.
+ *
+ * Copyright (C) 2011 Joel Murphy, All rights reserved
+ * The code in this file is licensed under GPL v2. This license does not 
+ * extend to any file bundled with this one.
+ * * * */ 
+
 #ifdef _WIN32
+#pragma comment(lib, "Ws2_32.lib")
 #include <WinSock2.h>
 #include <WS2tcpip.h>
-#pragma comment(lib, "Ws2_32.lib")
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -89,7 +97,7 @@ int main(int argc, char **argv) {
 
 			rc = sendto(p1->sp_socket, obuf, sizeof (obuf), 0, p1->sp_iface->ai_addr, p1->sp_iface->ai_addrlen);
 			if (rc == SOCKET_ERROR) {
-				fprintf(stderr, "Failed to send to multicast address. %s\n", wsa_strerror(WSAGetLastError()));
+				fprintf(stderr, "Failed to send to multicast address. %s\n", sock_error());
 				goto cleanup;
 			}
 			printf("Sent handshake packet to ");
@@ -106,7 +114,7 @@ int main(int argc, char **argv) {
 			fromlen = sizeof (fromaddr);
 			rc = recvfrom(p1->sp_socket, ibuf, SP_BUFSIZE, 0, &fromaddr, &fromlen);
 			if (rc == SOCKET_ERROR) {
-				fprintf(stderr, "Failed to receive multicast packet. %s\n", wsa_strerror(WSAGetLastError()));
+				fprintf(stderr, "Failed to receive multicast packet. %s\n", sock_error());
 				goto cleanup;
 			}
 			memcpy(&hsp, ibuf, sizeof (hsp));

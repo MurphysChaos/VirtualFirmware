@@ -1,3 +1,13 @@
+/* panel.c -- Panels are a conceptual extension of a socket. They are 
+ * intended to assist in the creation of socket programs by reducing 
+ * the amount of code the author must write and by reducing code differences
+ * between Windows and Linux.
+ *
+ * Copyright (C) 2011 Joel Murphy, Jacob Keller, All rights reserved
+ * The code in this file is licensed under GPL v2. This license does not 
+ * extend to any file bundled with this one.
+ * * * */ 
+
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #pragma comment(lib, "Ws2_32.lib")

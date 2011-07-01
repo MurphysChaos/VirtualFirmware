@@ -1,3 +1,18 @@
+#ifdef _WIN32
+#pragma comment(lib, "Ws2_32.lib")
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdlib.h>
+#include <netdb.h>
+#include <errno.h>
+#endif
+#include <stdint.h>
+#include <stdio.h>
+#include "panel.h"
+#include "sockerr.h"
 
 /*
  * anounce()

@@ -1,18 +1,4 @@
-#ifdef _WIN32
-#pragma comment(lib, "Ws2_32.lib")
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#else
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <stdlib.h>
-#include <netdb.h>
-#include <errno.h>
-#endif
-#include <stdint.h>
-#include <stdio.h>
-#include "panel.h"
-#include "sockerr.h"
+#include "message.h"
 
 struct announce_msg {
   uint32_t magic;
@@ -106,6 +92,9 @@ int announce(char* d_port, int magic) {
       socket = accept(cs->sp_socket, &(cs->sp_dest), &acceptlen);
      }
   }
+
+  FreePanel(hs);
+  DissociatePanel(cs);
  
   return socket;
 
@@ -188,6 +177,9 @@ int locate(int magic) {
       }
     }
   }
+
+  FreePanel(hs);
+  DissociatePanel(cs);
 
   return socket;
 

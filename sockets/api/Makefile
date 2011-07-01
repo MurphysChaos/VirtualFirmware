@@ -1,9 +1,12 @@
 CC = gcc
 AR = ar rcs
 CFLAGS = -g -O2 #-fPIC
-OBJECTS = panel.o sockerr.o
+OBJECTS = panel.o sockerr.o tinymsg.o
 LIBS = libpanel.a libsockerr.a libmessage.a
-LDFLAGS = -L. -lpanel -lsockerr
+LDFLAGS = -L. -lmessage -lpanel -lsockerr
+
+tinymsg: $(LIBS) tinymsg.o
+	$(CC) $(CFLAGS) tinymsg.o $(LDFLAGS) -o $@
 
 lib%.a : %.o
 	$(AR) $@ $<
@@ -12,4 +15,4 @@ lib%.a : %.o
 	$(CC) $(CFLAGS) -c $<
 
 clean:
-	rm -f $(OBJECTS) $(TTO) $(LIBS) *~ 
+	rm -f $(OBJECTS) $(TTO) $(LIBS) *~ tinymsg

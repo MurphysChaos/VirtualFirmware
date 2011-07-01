@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "panel.h"
-#include "sock_error.h"
+#include "sockerr.h"
 
 #define UDP_ADDR "234.1.1.10"	// Globally-scoped IPv4 multicast (same subnet)
 #define UDP_PORT "9751"			// IANA unassigned port

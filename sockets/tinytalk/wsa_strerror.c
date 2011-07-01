@@ -11,6 +11,8 @@
  * remainder of the file.
  * * * */
 
+#ifdef _WIN32
+
 #include "wsa_strerror.h"
 
 /* Returns the Microsoft-specified description of a particular winsock
@@ -306,3 +308,5 @@ const char *wsa_strerror(int e) {
 	}
 	return NULL;
 }
+
+#endif

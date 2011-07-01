@@ -246,7 +246,6 @@ int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr) {
     }
     rc = setsockopt(p->sp_socket, optlvl, option, optval, optlen);
     if (rc == SOCKET_ERROR) {
-        fprintf(stderr, "Failed to set multicast send interface. %s\n", sock_error());
         return SOCKET_ERROR;
     }
 

@@ -1,9 +1,15 @@
 CC = gcc
-CFLAGS = -g -O2
-OBJECTS = api.o panel.o sock_error.o
+AR = ar rcs
+CFLAGS = -g -O2 #-fPIC
+OBJECTS = panel.o sockerr.o
+LIBS = libpanel.a libsockerr.a libmessage.a
+LDFLAGS = -L. -lpanel -lsockerr
+
+lib%.a : %.o
+	$(AR) $@ $<
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c $<
 
 clean:
-	rm $(OBJECTS)
+	rm -f $(OBJECTS) $(TTO) $(LIBS) *~ 

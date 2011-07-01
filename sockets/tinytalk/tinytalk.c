@@ -173,7 +173,7 @@ int main(int argc, char **argv) {
 		PrintAddr(stdout, &(p2->sp_dest));
 		printf("\n");
 	} else {
-		p2 = CreateBoundPanel(INADDR_ANY,"0",AF_INET,SOCK_STREAM,IPPROTO_TCP);
+		p2 = CreateBoundPanel("0",AF_INET,SOCK_STREAM,IPPROTO_TCP);
 		sockaddr_size = sizeof (struct sockaddr);
 		// Wait for announcement
 		rc = recvfrom(p1->sp_socket, ibuf, TT_BUFSIZE, 0, &(p2->sp_dest), &sockaddr_size);

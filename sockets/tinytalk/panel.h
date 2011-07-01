@@ -31,6 +31,8 @@ extern "C" {
 #endif
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 /*
  * A trio of Winsock constants. 

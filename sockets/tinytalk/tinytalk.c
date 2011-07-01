@@ -28,7 +28,7 @@
 
 #define UDP_ADDR "234.1.1.10"	// Globally-scoped IPv4 multicast (same subnet)
 #define UDP_PORT "9751"			// IANA unassigned port
-#define UDP_TTL 5				// Time to live -- gives a max lifespan of 5 seconds
+#define UDP_TTL 16				// Time to live -- gives a max lifespan of 5 seconds
 #define TCP_PORT "9752"			// IANA unassigned port
 #define HS_MAGICNUM 0x1e36
 

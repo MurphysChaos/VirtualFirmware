@@ -86,9 +86,14 @@ int main(int argc, char **argv) {
 	ProcessArgs(argc, argv);
 
 	// Create the announce socket.
-	p1 = CreateBoundPanel(UDP_ADDR,UDP_PORT,AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+	p1 = CreateBoundPanel(INADDR_ANY,UDP_PORT,AF_INET,SOCK_DGRAM,IPPROTO_UDP);
 	if (p1 == NULL) {
-		fprintf(stderr, "Failed to create bound panel. %s\n", sock_error());
+		fprintf(stderr, "Failed to create bound panel p1. %s\n", sock_error());
+		goto cleanup;
+	}
+	rc = SetDestination(p1,UDP_ADDR,UDP_PORT);
+	if (rc == SOCKET_ERROR) {
+		fprintf(stderr, "Failed to set destination for panel p1. %s\n", sock_error());
 		goto cleanup;
 	}
 	rc = MakeMulticast(p1);
@@ -106,7 +111,6 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Failed to set multicast loopback. %s\n", sock_error());
 		goto cleanup;
 	}
-	printf("Socket promoted to multicast.\n");
 
 	if (bIsServer) {
 		// Prepare to accept connections.

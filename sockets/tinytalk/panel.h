@@ -48,6 +48,16 @@ extern "C" {
 #define SOCKET_ERROR (~0)
 #endif
 
+/* Flag Macros & Flags
+ */
+#define sp_setflag(var,flag)	(var | flag)
+#define sp_getflag(var,flag)	(var & flag)
+#define sp_clearflag(var,flag)	(var & ~(flag))
+#define SP_F_VALID		0x0001
+#define SP_F_LISTENER	0x0002
+#define SP_F_SENDER		0x0004
+#define SP_F_MULTICAST	0x0010
+
 /*
  * A "socket-panel" structure that keeps track of relevant creation
  * data.
@@ -56,8 +66,11 @@ typedef struct socket_panel {
     uint32_t sp_socket;
 	struct sockaddr sp_bind;
 	struct sockaddr sp_dest;
-	uint16_t flags;
-	uint16_t zero;
+	uint32_t sp_family;
+	uint32_t sp_socktype;
+	uint32_t sp_protocol;
+	uint16_t sp_flags;
+	uint16_t sp_zero;
 } SOCKET_PANEL, PANEL;
 
 /*
@@ -72,12 +85,15 @@ typedef struct sp_announce {
 
 /* Functions for creating socket panels. */
 PANEL *CreateEmptyPanel();
+PANEL *CreatePanel(int af, int type, int proto);
 PANEL *CreateBoundPanel(char *addr, char *svc, int af, int type, int proto);
 PANEL *SocketToPanel(int s, struct sockaddr *addr);
 void FreePanel(PANEL *p);
-/* == MANIPULATOR FUNCTIONS */
+/* == UTILITY FUNCTIONS */
 struct addrinfo *ResolveAddr(char *addr, char *svc, int af, int type, int proto);
-int BindPanel(PANEL *p, char *addr, char *svc, int af, int type, int proto);
+/* == MANIPULATOR FUNCTIONS */
+int BindPanel(PANEL *p, char *addr, char *svc);
+int SetDestination(PANEL *p, char *addr, char *svc);
 /* -- Functions for multicasting */
 int MakeMulticast(PANEL *p);
 int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr);

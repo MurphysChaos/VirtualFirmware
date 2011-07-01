@@ -28,11 +28,11 @@ PANEL *CreateEmptyPanel() {
     return p;
 }
 
-/* The primary means of creating a panel.
+/* Creates a panel with only an active socket. Useful for most of your 
+ * socket-panel needs.
  */
-PANEL *CreateBoundPanel(char *addr, char *svc, int af, int type, int proto) {
-    PANEL *p = CreateEmptyPanel();
-    int rc, optval = -1;
+PANEL *CreatePanel(int af, int type, int proto) {
+	PANEL *p = CreateEmptyPanel();
 
     // Create the socket.
     p->sp_socket = socket(af, type, proto);
@@ -40,6 +40,21 @@ PANEL *CreateBoundPanel(char *addr, char *svc, int af, int type, int proto) {
         FreePanel(p);
         return NULL;
     }
+	p->sp_family = af;
+	p->sp_socktype = type;
+	p->sp_protocol = proto;
+	p->sp_flags = sp_setflag(p->sp_flags, SP_F_VALID);
+
+	return p;
+}
+
+/* Creates a panel that is pre-bound to an outgoing port. The contained 
+ * socket will listen on all active interfaces. Use CreatePanel() then 
+ * BindPanel() to listen on a specific interface.
+ */
+PANEL *CreateBoundPanel(char *addr, char *svc, int af, int type, int proto) {
+    PANEL *p = CreatePanel(af, type, proto);
+    int rc, optval = -1;
 
     // Set socket to reusable
     rc = setsockopt(p->sp_socket, SOL_SOCKET, SO_REUSEADDR, (char *) &optval, sizeof (optval));
@@ -49,7 +64,7 @@ PANEL *CreateBoundPanel(char *addr, char *svc, int af, int type, int proto) {
     }
 
 	// Bind socket to address
-	rc = BindPanel(p, addr, svc, af, type, proto);
+	rc = BindPanel(p, INADDR_ANY, svc);
 	if (rc == SOCKET_ERROR) {
 		FreePanel(p);
 		return NULL;
@@ -66,6 +81,7 @@ PANEL *SocketToPanel(int s, struct sockaddr *addr) {
     // Copy received data
 	p->sp_socket = s;
 	memcpy(&(p->sp_bind), addr, sizeof (addr));
+	p->sp_flags = sp_setflag(p->sp_flags, SP_F_VALID);
     
     return p;
 }
@@ -102,20 +118,52 @@ struct addrinfo *ResolveAddr(char *addr, char *svc, int af, int type, int proto)
 	}
 }
 
-/* Causes a panel to bind to the stored bind address.
+/* Causes a panel to bind to the stored bind address. Must be used on a 
+ * valid panel.
  */
-int BindPanel(PANEL *p, char *addr, char *svc, int af, int type, int proto) {
+int BindPanel(PANEL *p, char *addr, char *svc) {
 	struct addrinfo *ai = NULL;
+	int rc;
 
-	// Resolve bind address
-	ai = ResolveAddr(addr, svc, af, type, proto);
-	if (ai == NULL)
+	if (sp_getflag(p->sp_flags, SP_F_VALID)) {
+		// Resolve bind address
+		ai = ResolveAddr(addr, svc, p->sp_family, p->sp_socktype, p->sp_protocol);
+		if (ai == NULL)
+			return SOCKET_ERROR;
+		memcpy(&(p->sp_bind), ai->ai_addr, ai->ai_addrlen);
+		freeaddrinfo(ai);
+	} else {
+		// Needs to set an error number. We need a function that will 
+		// do the reverse of our sock_error() function.
 		return SOCKET_ERROR;
-	memcpy(&(p->sp_bind), ai->ai_addr, ai->ai_addrlen);
-	freeaddrinfo(ai);
+	}
 
     // Bind the socket
-	return bind(p->sp_socket, &(p->sp_bind), sizeof (p->sp_bind));
+	sp_setflag(p->sp_flags,SP_F_LISTENER);
+	rc = bind(p->sp_socket, &(p->sp_bind), sizeof(p->sp_bind));
+	return rc;
+}
+
+/* Aligns outgoing traffic for the panel. Must be used on a valid panel.
+ */
+int SetDestination(PANEL *p, char *addr, char *svc) {
+	struct addrinfo *ai = NULL;
+
+	if (sp_getflag(p->sp_flags, SP_F_VALID)) {
+		// Resolve destination address
+		ai = ResolveAddr(addr, svc, p->sp_family, p->sp_socktype, p->sp_protocol);
+		if (ai == NULL)
+			return SOCKET_ERROR;
+		memcpy(&(p->sp_dest), ai->ai_addr, ai->ai_addrlen);
+		freeaddrinfo(ai);
+	} else {
+		// Needs to set an error number. We need a function that will 
+		// do the reverse of our sock_error() function.
+		return SOCKET_ERROR;
+	}
+
+	sp_setflag(p->sp_flags,SP_F_SENDER);
+	return NO_ERROR;
 }
 
 /* Make an existing panel into a multicast panel by joining the multicast group
@@ -166,6 +214,7 @@ int MakeMulticast(PANEL *p) {
         return SOCKET_ERROR;
     }
 
+	sp_setflag(p->sp_flags,SP_F_MULTICAST);
     return rc;
 }
 

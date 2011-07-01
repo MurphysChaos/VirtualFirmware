@@ -90,9 +90,21 @@ PANEL *SocketToPanel(int s, struct sockaddr *addr) {
  */
 void FreePanel(PANEL *p) {
     if (p) {
+#ifdef _WIN32
+        closesocket(p->sp_socket);
+#else
+        close(p->sp_socket);
+#endif
         free(p);
     }
-    p = NULL;
+}
+
+/* Nicely free the panel, but leave the socket behind
+ */
+void DissociatePanel(PANEL *p) {
+  if (p) {
+    free(p);
+  }
 }
 
 /* Resolves a general address and service specifier into a net-standard 

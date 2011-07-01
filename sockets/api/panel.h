@@ -88,6 +88,7 @@ PANEL *CreatePanel(int af, int type, int proto);
 PANEL *CreateBoundPanel(char *svc, int af, int type, int proto);
 PANEL *SocketToPanel(int s, struct sockaddr *addr);
 void FreePanel(PANEL *p);
+void DissociatePanel(PANEL *p);
 /* == UTILITY FUNCTIONS */
 struct addrinfo *ResolveAddr(char *addr, char *svc, int af, int type, int proto);
 /* == MANIPULATOR FUNCTIONS */

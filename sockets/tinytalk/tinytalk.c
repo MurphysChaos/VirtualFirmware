@@ -20,11 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "panel.h"
-#include "sock_error.h"
-
-#ifndef _WIN32
-#define Sleep(x) usleep(1000*x)
-#endif
+#include "sockerr.h"
 
 #define UDP_ADDR "234.1.1.10"	// Globally-scoped IPv4 multicast (same subnet)
 #define UDP_PORT "9751"			// IANA unassigned port
@@ -173,7 +169,7 @@ int main(int argc, char **argv) {
 		PrintAddr(stdout, &(p2->sp_dest));
 		printf("\n");
 	} else {
-		p2 = CreateBoundPanel(INADDR_ANY,"0",AF_INET,SOCK_STREAM,IPPROTO_TCP);
+		p2 = CreateBoundPanel("0",AF_INET,SOCK_STREAM,IPPROTO_TCP);
 		sockaddr_size = sizeof (struct sockaddr);
 		// Wait for announcement
 		rc = recvfrom(p1->sp_socket, ibuf, TT_BUFSIZE, 0, &(p2->sp_dest), &sockaddr_size);

@@ -5,7 +5,7 @@
  * extend to any file bundled with this one.
  * * * */
 
-#include "sock_error.h"
+#include "sockerr.h"
 
 const char* sock_error() {
   int errval = errno;

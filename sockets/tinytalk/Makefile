@@ -1,20 +1,22 @@
 CC = gcc
-CFLAGS = -g -O2 -fPIC
-LIBFLAGS = -shared
+AR = ar rcs
+CFLAGS = -g -O2 #-fPIC
 OBJECTS = panel.o sock_error.o
 TTO = tinytalk.o
 
-tinytalk: $(OBJECTS) $(TTO) libpanel
+tinytalk: $(TTO) libpanel.a
 	$(CC) $(CFLAGS) $(TTO) -L. -lpanel -o tinytalk
 	
-tinytalk.exe: $(OBJECTS) $(TTO)
-	$(CC) $(CFLAGS) $(OBJECTS) $(TTO) -o tinytalk.exe
+tinytalk.exe: $(TTO) libpanel.a
+	$(CC) $(CFLAGS) $(TTO) -L. -lpanel -o tinytalk.exe
 	
-libpanel: $(OBJECTS)
-	$(CC) $(LIBFLAGS) -W1,-soname,libpanel.so.0 -o libpanel.so.0.0.1 $(OBJECTS)
+libpanel.a: $(OBJECTS)
+	$(AR) libpanel.a $(OBJECTS)
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c $<
 
 clean:
-	rm $(OBJECTS)
+	rm $(OBJECTS) $(TTO) tinytalk libpanel.a
+
+

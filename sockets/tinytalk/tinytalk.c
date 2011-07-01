@@ -22,10 +22,6 @@
 #include "panel.h"
 #include "sock_error.h"
 
-#ifndef _WIN32
-#define Sleep(x) usleep(1000*x)
-#endif
-
 #define UDP_ADDR "234.1.1.10"	// Globally-scoped IPv4 multicast (same subnet)
 #define UDP_PORT "9751"			// IANA unassigned port
 #define UDP_TTL 16				// Time to live -- gives a max lifespan of 5 seconds

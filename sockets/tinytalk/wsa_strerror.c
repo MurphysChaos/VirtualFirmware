@@ -9,15 +9,308 @@
  * The error strings included in this file are copyright Microsoft. No 
  * intellectual property claim is stated or implied by the author of the 
  * remainder of the file.
- * * * */
+ */
 
 #ifdef _WIN32
 
 #include "wsa_strerror.h"
 
+#if 0
+int errnotowsa(int e) {
+	switch (e) {
+	case 0: // 6: "Specified event object handle is invalid."
+		return WSA_INVALID_HANDLE;
+		break;
+	case 0: // 8: "Insufficient memory available."
+		return WSA_NOT_ENOUGH_MEMORY;
+		break;
+	case 0: // 87: "One or more parameters are invalid."
+		return WSA_INVALID_PARAMETER;
+		break;
+	case 0: // 995: "Overlapped operation aborted."
+		return WSA_OPERATION_ABORTED;
+		break;
+	case 0: // 996: "Overlapped I/O event object not in signaled state."
+		return WSA_IO_INCOMPLETE;
+		break;
+	case 0: // 997: "Overlapped operations will complete later."
+		return WSA_IO_PENDING;
+		break;
+	case 0: // 10004: "Interrupted function call."
+		return WSAEINTR;
+		break;
+	case 0: // 10009: "File handle is not valid."
+		return WSAEBADF;
+		break;
+	case 0: // 10013: "Permission denied."
+		return WSAEACCES;
+		break;
+	case 0: // 10014: "Bad address."
+		return WSAEFAULT;
+		break;
+	case 0: // 10022: "Invalid argument."
+		return WSAEINVAL;
+		break;
+	case 0: // 10024: "Too many open files."
+		return WSAEMFILE;
+		break;
+	case 0: // 10035: "Resource temporarily unavailable."
+		return WSAEWOULDBLOCK;
+		break;
+	case 0: // 10036: "Operation now in progress."
+		return WSAEINPROGRESS;
+		break;
+	case 0: // 10037: "Operation already in progress."
+		return WSAEALREADY;
+		break;
+	case 0: // 10038: "Socket operation on nonsocket."
+		return WSAENOTSOCK;
+		break;
+	case 0: // 10039: "Destination address required."
+		return WSAEDESTADDRREQ;
+		break;
+	case 0: // 10040: "Message too long."
+		return WSAEMSGSIZE;
+		break;
+	case 0: // 10041: "Protocol wrong type for socket."
+		return WSAEPROTOTYPE;
+		break;
+	case 0: // 10042: "Bad protocol option."
+		return WSAENOPROTOOPT;
+		break;
+	case 0: // 10043: "Protocol not supported."
+		return WSAEPROTONOSUPPORT;
+		break;
+	case 0: // 10044: "Socket type not supported."
+		return WSAESOCKTNOSUPPORT;
+		break;
+	case 0: // 10045: "Operation not supported."
+		return WSAEOPNOTSUPP;
+		break;
+	case 0: // 10046: "Protocol family not supported."
+		return WSAEPFNOSUPPORT;
+		break;
+	case 0: // 10047: "Address family not supported by protocol family."
+		return WSAEAFNOSUPPORT;
+		break;
+	case 0: // 10048: "Address already in use."
+		return WSAEADDRINUSE;
+		break;
+	case 0: // 10049: "Cannot assign requested address."
+		return WSAEADDRNOTAVAIL;
+		break;
+	case 0: // 10050: "Network is down."
+		return WSAENETDOWN;
+		break;
+	case 0: // 10051: "Network is unreachable."
+		return WSAENETUNREACH;
+		break;
+	case 0: // 10052: "Network dropped connection on reset."
+		return WSAENETRESET;
+		break;
+	case 0: // 10053: "Software caused connection abort."
+		return WSAECONNABORTED;
+		break;
+	case 0: // 10054: "Connection reset by peer."
+		return WSAECONNRESET;
+		break;
+	case 0: // 10055: "No buffer space available."
+		return WSAENOBUFS;
+		break;
+	case 0: // 10056: "Socket is already connected."
+		return WSAEISCONN;
+		break;
+	case 0: // 10057: "Socket is not connected."
+		return WSAENOTCONN;
+		break;
+	case 0: // 10058: "Cannot send after socket shutdown."
+		return WSAESHUTDOWN;
+		break;
+	case 0: // 10059: "Too many references."
+		return WSAETOOMANYREFS;
+		break;
+	case 0: // 10060: "Connection timed out."
+		return WSAETIMEDOUT;
+		break;
+	case 0: // 10061: "Connection refused."
+		return WSAECONNREFUSED;
+		break;
+	case 0: // 10062: "Cannot translate name."
+		return WSAELOOP;
+		break;
+	case 0: // 10063: "Name too long."
+		return WSAENAMETOOLONG;
+		break;
+	case 0: // 10064: "Host is down."
+		return WSAEHOSTDOWN;
+		break;
+	case 0: // 10065: "No route to host."
+		return WSAEHOSTUNREACH;
+		break;
+	case 0: // 10066: "Directory not empty."
+		return WSAENOTEMPTY;
+		break;
+	case 0: // 10067: "Too many processes."
+		return WSAEPROCLIM;
+		break;
+	case 0: // 10068: "User quota exceeded."
+		return WSAEUSERS;
+		break;
+	case 0: // 10069: "Disk quota exceeded."
+		return WSAEDQUOT;
+		break;
+	case 0: // 10070: "Stale file handle reference."
+		return WSAESTALE;
+		break;
+	case 0: // 10071: "Item is remote."
+		return WSAEREMOTE;
+		break;
+	case 0: // 10091: "Network subsystem is unavailable."
+		return WSASYSNOTREADY;
+		break;
+	case 0: // 10092: "Winsock.dll version out of range."
+		return WSAVERNOTSUPPORTED;
+		break;
+	case 0: // 10093: "Successful WSAStartup not yet performed."
+		return WSANOTINITIALISED;
+		break;
+	case 0: // 10101: "Graceful shutdown in progress."
+		return WSAEDISCON;
+		break;
+	case 0: // 10102: "No more results."
+		return WSAENOMORE;
+		break;
+	case 0: // 10103: "Call has been canceled."
+		return WSAECANCELLED;
+		break;
+	case 0: // 10104: "Procedure call table is invalid."
+		return WSAEINVALIDPROCTABLE;
+		break;
+	case 0: // 10105: "Service provider is invalid."
+		return WSAEINVALIDPROVIDER;
+		break;
+	case 0: // 10106: "Service provider failed to initialize."
+		return WSAEPROVIDERFAILEDINIT;
+		break;
+	case 0: // 10107: "System call failure."
+		return WSASYSCALLFAILURE;
+		break;
+	case 0: // 10108: "Service not found."
+		return WSASERVICE_NOT_FOUND;
+		break;
+	case 0: // 10109: "Class type not found."
+		return WSATYPE_NOT_FOUND;
+		break;
+	case 0: // 10110: "No more results."
+		return WSA_E_NO_MORE;
+		break;
+	case 0: // 10111: "Call was canceled."
+		return WSA_E_CANCELLED;
+		break;
+	case 0: // 10112: "Database query was refused."
+		return WSAEREFUSED;
+		break;
+	case 0: // 11001: "Host not found."
+		return WSAHOST_NOT_FOUND;
+		break;
+	case 0: // 11002: "Nonauthoritative host not found."
+		return WSATRY_AGAIN;
+		break;
+	case 0: // 11003: "This is a nonrecoverable error."
+		return WSANO_RECOVERY;
+		break;
+	case 0: // 11004: "Valid name, no data record of requested type."
+		return WSANO_DATA;
+		break;
+	case 0: // 11005: "QoS receivers."
+		return WSA_QOS_RECEIVERS;
+		break;
+	case 0: // 11006: "QoS senders."
+		return WSA_QOS_SENDERS;
+		break;
+	case 0: // 11007: "No QoS senders."
+		return WSA_QOS_NO_SENDERS;
+		break;
+	case 0: // 11008: "QoS no receivers."
+		return WSA_QOS_NO_RECEIVERS;
+		break;
+	case 0: // 11009: "QoS request confirmed."
+		return WSA_QOS_REQUEST_CONFIRMED;
+		break;
+	case 0: // 11010: "QoS admission error."
+		return WSA_QOS_ADMISSION_FAILURE;
+		break;
+	case 0: // 11011: "QoS policy failure."
+		return WSA_QOS_POLICY_FAILURE;
+		break;
+	case 0: // 11012: "QoS bad style."
+		return WSA_QOS_BAD_STYLE;
+		break;
+	case 0: // 11013: "QoS bad object."
+		return WSA_QOS_BAD_OBJECT;
+		break;
+	case 0: // 11014: "QoS traffic control error."
+		return WSA_QOS_TRAFFIC_CTRL_ERROR;
+		break;
+	case 0: // 11015: "QoS generic error."
+		return WSA_QOS_GENERIC_ERROR;
+		break;
+	case 0: // 11016: "QoS service type error."
+		return WSA_QOS_ESERVICETYPE;
+		break;
+	case 0: // 11017: "QoS flowspec error."
+		return WSA_QOS_EFLOWSPEC;
+		break;
+	case 0: // 11018: "Invalid QoS provider buffer."
+		return WSA_QOS_EPROVSPECBUF;
+		break;
+	case 0: // 11019: "Invalid QoS filter style."
+		return WSA_QOS_EFILTERSTYLE;
+		break;
+	case 0: // 11020: "Invalid QoS filter type."
+		return WSA_QOS_EFILTERTYPE;
+		break;
+	case 0: // 11021: "Incorrect QoS filter count."
+		return WSA_QOS_EFILTERCOUNT;
+		break;
+	case 0: // 11022: "Invalid QoS object length."
+		return WSA_QOS_EOBJLENGTH;
+		break;
+	case 0: // 11023: "Incorrect QoS flow count."
+		return WSA_QOS_EFLOWCOUNT;
+		break;
+	case 0: // 11024: "Unrecognized QoS object."
+		return WSA_QOS_EUNKOWNPSOBJ;
+		break;
+	case 0: // 11025: "Invalid QoS policy object."
+		return WSA_QOS_EPOLICYOBJ;
+		break;
+	case 0: // 11026: "Invalid QoS flow descriptor."
+		return WSA_QOS_EFLOWDESC;
+		break;
+	case 0: // 11027: "Invalid QoS provider-specific flowspec."
+		return WSA_QOS_EPSFLOWSPEC;
+		break;
+	case 0: // 11028: "Invalid QoS provider-specific filterspec."
+		return WSA_QOS_EPSFILTERSPEC;
+		break;
+	case 0: // 11029: "Invalid QoS shape discard mode object."
+		return WSA_QOS_ESDMODEOBJ;
+		break;
+	case 0: // 11030: "Invalid QoS shaping rate object."
+		return WSA_QOS_ESHAPERATEOBJ;
+		break;
+	case 0: // 11031: "Reserved policy QoS element type."
+		return WSA_QOS_RESERVED_PETYPE;
+		break;
+	}
+	return NULL;
+}
+#endif
+
 /* Returns the Microsoft-specified description of a particular winsock
  * error.
- * * * */
+ */
 const char *wsa_strerror(int e) {
 	switch (e) {
 	case WSA_INVALID_HANDLE: // 6

@@ -26,9 +26,9 @@
 #define Sleep(x) usleep(1000*x)
 #endif
 
-#define UDP_ADDR "239.1.1.10"	// Locally-scoped IPv4 multicast (same subnet)
+#define UDP_ADDR "234.1.1.10"	// Globally-scoped IPv4 multicast (same subnet)
 #define UDP_PORT "9751"			// IANA unassigned port
-#define UDP_TTL 1				// Time to live -- gives a max lifespan of 1 second
+#define UDP_TTL 5				// Time to live -- gives a max lifespan of 5 seconds
 #define TCP_PORT "9752"			// IANA unassigned port
 #define HS_MAGICNUM 0x1e36
 
@@ -63,17 +63,15 @@ int main(int argc, char **argv) {
 	PANEL			*p1 = NULL,
 					*p2 = NULL,
 					*p3 = NULL;
-	struct sockaddr	fromaddr;
-	int				fromlen,
-					fromsock = INVALID_SOCKET;
 	fd_set			readfds;
 	struct timeval	tv;
 	size_t			ps = sizeof (PANEL);
 	char			obuf[SP_BUFSIZE], 
 					ibuf[SP_BUFSIZE];
 	HSPACKET		hsp;
-	int				rc, 
-					i;
+	int				sockaddr_size,
+					sockdest = INVALID_SOCKET,
+					rc;
 
 #ifdef _WIN32
     // Load Winsock
@@ -87,40 +85,53 @@ int main(int argc, char **argv) {
 
 	ProcessArgs(argc, argv);
 
-	p1 = GetNewPanel(UDP_ADDR,UDP_PORT,AF_INET,SOCK_DGRAM,IPPROTO_UDP);
-	if (p1) {
-		MakeMulticast(p1);
-		SetMulticastTTL(p1, UDP_TTL);
-		SetMulticastLoopback(p1, 1);
-		printf("Socket promoted to multicast.\n");
-	} else {
-		fprintf(stderr, "Multicast socket creation failed. Exiting.");
+	// Create the announce socket.
+	p1 = CreateBoundPanel(UDP_ADDR,UDP_PORT,AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+	if (p1 == NULL) {
+		fprintf(stderr, "Failed to create bound panel. %s\n", sock_error());
 		goto cleanup;
 	}
+	rc = MakeMulticast(p1);
+	if (rc == SOCKET_ERROR) {
+		fprintf(stderr, "Failed to promote panel p1 to multicast. %s\n", sock_error());
+		goto cleanup;
+	}
+	rc = SetMulticastTTL(p1, UDP_TTL);
+	if (rc == SOCKET_ERROR) {
+		fprintf(stderr, "Failed to set multicast TTL. %s\n", sock_error());
+		goto cleanup;
+	}
+	rc = SetMulticastLoopback(p1, 1);
+	if (rc == SOCKET_ERROR) {
+		fprintf(stderr, "Failed to set multicast loopback. %s\n", sock_error());
+		goto cleanup;
+	}
+	printf("Socket promoted to multicast.\n");
 
 	if (bIsServer) {
 		// Prepare to accept connections.
-		p2 = GetNewPanel(INADDR_ANY,TCP_PORT,AF_INET,SOCK_STREAM,IPPROTO_TCP);
+		p2 = CreateBoundPanel(INADDR_ANY,TCP_PORT,AF_INET,SOCK_STREAM,IPPROTO_TCP);
 		rc = listen(p2->sp_socket, 1);
 		if (rc == SOCKET_ERROR) {
 			fprintf(stderr, "Failed to begin listening for new connections. %s\n", sock_error());
 			goto cleanup;
 		}
+
 		// Announce until we detect a connection
-		while (fromsock == INVALID_SOCKET) {
+		while (sockdest == INVALID_SOCKET) {
 			// Build outgoing datagram
 			hsp.magic = htonl(HS_MAGICNUM);
 			hsp.port = htons(atoi(TCP_PORT));
 			memcpy(obuf, &hsp, sizeof (hsp));
 
 			// Sending datagram
-			rc = sendto(p1->sp_socket, obuf, sizeof (obuf), 0, p1->sp_iface->ai_addr, p1->sp_iface->ai_addrlen);
+			rc = sendto(p1->sp_socket, obuf, sizeof (obuf), 0, &(p1->sp_dest), sizeof (p1->sp_dest));
 			if (rc == SOCKET_ERROR) {
 				fprintf(stderr, "Failed to send to multicast address. %s\n", sock_error());
 				goto cleanup;
 			}
 			printf("Sent handshake packets to ");
-			PrintSockaddr(stdout, p1->sp_iface->ai_addr);
+			PrintAddr(stdout, &(p1->sp_dest));
 			printf("\n");
 
 			// Preparing to receive incoming TCP connection
@@ -138,29 +149,29 @@ int main(int argc, char **argv) {
 				// No triggered events. Nothing to do.
 			} else {
 				// Connect request from client
-				fromlen = sizeof fromaddr;
-				fromsock = accept(p2->sp_socket, &fromaddr, &fromlen);
+				sockaddr_size = sizeof (struct sockaddr);
+				sockdest = accept(p2->sp_socket, &(p2->sp_dest), &sockaddr_size);
 				printf("Connection established with client at ");
-				PrintSockaddr(stdout, &fromaddr);
+				PrintAddr(stdout, &(p1->sp_bind));
 				printf("\n");
 				break;
 			}
 		}
 
 		// Connection established. Receive some data.
-		rc = recv(fromsock, ibuf, SP_BUFSIZE, 0);
+		rc = recv(sockdest, ibuf, SP_BUFSIZE, 0);
 		if (rc == SOCKET_ERROR) {
 			fprintf(stderr, "Failed to receive usable data. %s\n", sock_error());
 			goto cleanup;
 		}
 		printf("Received %u bytes from ", SP_BUFSIZE);
-		PrintSockaddr(stdout, &fromaddr);
+		PrintAddr(stdout, &(p2->sp_dest));
 		printf("\n");
 	} else {
-		p2 = GetNewPanel(INADDR_ANY,"0",AF_INET,SOCK_STREAM,IPPROTO_TCP);
-		fromlen = sizeof (fromaddr);
+		p2 = CreateBoundPanel(INADDR_ANY,"0",AF_INET,SOCK_STREAM,IPPROTO_TCP);
+		sockaddr_size = sizeof (struct sockaddr);
 		// Wait for announcement
-		rc = recvfrom(p1->sp_socket, ibuf, SP_BUFSIZE, 0, &fromaddr, &fromlen);
+		rc = recvfrom(p1->sp_socket, ibuf, SP_BUFSIZE, 0, &(p2->sp_dest), &sockaddr_size);
 		if (rc == SOCKET_ERROR) {
 			fprintf(stderr, "Failed to receive multicast packet. %s\n", sock_error());
 			goto cleanup;
@@ -173,24 +184,24 @@ int main(int argc, char **argv) {
 		if (hsp.magic == HS_MAGICNUM) {
 			// Valid handshake received, connect to server
 			printf("Handshake packet received from ");
-			PrintSockaddr(stdout, &fromaddr);
+			PrintAddr(stdout, &(p2->sp_dest));
  			printf(". Server listening on port %u.\n", hsp.port);
 			// Alter address to match target.
-			((struct sockaddr_in *) &fromaddr)->sin_port = htons(hsp.port);
-			rc = connect(p2->sp_socket, &fromaddr, fromlen);
+			((struct sockaddr_in *) &(p2->sp_dest))->sin_port = htons(hsp.port);
+			rc = connect(p2->sp_socket, &(p2->sp_dest), sockaddr_size);
 			if (rc == SOCKET_ERROR) {
 				fprintf(stderr, "Failed to connect to ");
-				PrintSockaddr(stdout, &fromaddr);
+				PrintAddr(stdout, &(p2->sp_dest));
 				fprintf(stderr, "\n");
 			} else {
 				printf("Connection established with server at ");
-				PrintSockaddr(stdout, &fromaddr);
+				PrintAddr(stdout, &(p2->sp_dest));
 				printf("\n");
 			}
 		} else {
 			// Invalid handshake received. Just a test program so quit.
 			printf("Packet received from ");
-			PrintSockaddr(stdout, &fromaddr);
+			PrintAddr(stdout, &(p2->sp_dest));
 			printf(". Not recognized as handshake.\n");
 			goto cleanup;
 		}
@@ -199,12 +210,12 @@ int main(int argc, char **argv) {
 		rc = send(p2->sp_socket, obuf, SP_BUFSIZE, 0);
 		if (rc == SOCKET_ERROR) {
 			fprintf(stderr, "Failed to send %u bytes to ", SP_BUFSIZE);
-			PrintSockaddr(stdout, &fromaddr);
+			PrintAddr(stdout, &(p2->sp_dest));
 			fprintf(stderr, ". %s\n", sock_error());
 			goto cleanup;
 		}
 		printf("Sent %u bytes to ", SP_BUFSIZE);
-		PrintSockaddr(stdout, &fromaddr);
+		PrintAddr(stdout, &(p2->sp_dest));
 		printf("\n");
 	}
 

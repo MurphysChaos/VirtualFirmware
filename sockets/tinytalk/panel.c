@@ -52,7 +52,7 @@ PANEL *CreatePanel(int af, int type, int proto) {
  * socket will listen on all active interfaces. Use CreatePanel() then 
  * BindPanel() to listen on a specific interface.
  */
-PANEL *CreateBoundPanel(char *addr, char *svc, int af, int type, int proto) {
+PANEL *CreateBoundPanel(char *svc, int af, int type, int proto) {
     PANEL *p = CreatePanel(af, type, proto);
     int rc, optval = -1;
 
@@ -98,7 +98,8 @@ void FreePanel(PANEL *p) {
 /* Resolves a general address and service specifier into a net-standard 
  * internet address and port. The service an be a generalized service 
  * specifier (e.g. "http", "ftp", "smtp", etc.) or a specific port.
- * Returns NULL on error.
+ * Returns NULL on error. Use freeaddrinfo() on the return result after 
+ * you are done with it.
  */
 struct addrinfo *ResolveAddr(char *addr, char *svc, int af, int type, int proto) {
     struct addrinfo hints, *res = NULL;

@@ -31,9 +31,6 @@ extern "C" {
 #endif
 #include <stdint.h>
 #include <stdio.h>
-#include "sock_error.h"
-
-#define SP_BUFSIZE 1024					// Allows 1kb + 1 null.
 
 /*
  * A trio of Winsock constants. 
@@ -86,7 +83,7 @@ typedef struct sp_announce {
 /* Functions for creating socket panels. */
 PANEL *CreateEmptyPanel();
 PANEL *CreatePanel(int af, int type, int proto);
-PANEL *CreateBoundPanel(char *addr, char *svc, int af, int type, int proto);
+PANEL *CreateBoundPanel(char *svc, int af, int type, int proto);
 PANEL *SocketToPanel(int s, struct sockaddr *addr);
 void FreePanel(PANEL *p);
 /* == UTILITY FUNCTIONS */

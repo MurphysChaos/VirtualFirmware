@@ -27,12 +27,12 @@ extern "C" {
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <netdb.h>
-#include <errno.h>
 #endif
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "sockerr.h"
 
 /*
  * A trio of Winsock constants. 

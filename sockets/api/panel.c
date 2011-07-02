@@ -93,18 +93,17 @@ void FreePanel(PANEL *p) {
 #ifdef _WIN32
         closesocket(p->sp_socket);
 #else
-        close(p->sp_socket);
+	close(p->sp_socket);
 #endif
         free(p);
     }
 }
 
-/* Nicely free the panel, but leave the socket behind
- */
-void DissociatePanel(PANEL *p) {
-  if (p) {
-    free(p);
-  }
+/* Nicely delets panel information but leaves socket intact*/
+void DissociatePanel(PANEL* p) {
+    if (p) {
+        free(p);
+    }
 }
 
 /* Resolves a general address and service specifier into a net-standard 
@@ -146,8 +145,7 @@ int BindPanel(PANEL *p, char *addr, char *svc) {
 		memcpy(&(p->sp_bind), ai->ai_addr, ai->ai_addrlen);
 		freeaddrinfo(ai);
 	} else {
-		// Needs to set an error number. We need a function that will 
-		// do the reverse of our sock_error() function.
+		set_error(EPERM); // Operation not permitted.
 		return SOCKET_ERROR;
 	}
 
@@ -170,8 +168,7 @@ int SetDestination(PANEL *p, char *addr, char *svc) {
 		memcpy(&(p->sp_dest), ai->ai_addr, ai->ai_addrlen);
 		freeaddrinfo(ai);
 	} else {
-		// Needs to set an error number. We need a function that will 
-		// do the reverse of our sock_error() function.
+		set_error(EPERM); // Operation not permitted.
 		return SOCKET_ERROR;
 	}
 
@@ -216,8 +213,7 @@ int MakeMulticast(PANEL *p) {
         mreq6.ipv6mr_multiaddr = sin6->sin6_addr;
         mreq6.ipv6mr_interface = sin6->sin6_scope_id;
     } else {
-		// Needs to set an error number. We need a function that will 
-		// do the reverse of our sock_error() function.
+		set_error(EAFNOSUPPORT); // Address family not supported
         return SOCKET_ERROR;
     }
 
@@ -252,8 +248,7 @@ int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr) {
         optval = (char *) (((struct sockaddr_in6 *) addr)->sin6_scope_id);
         optlen = sizeof (((struct sockaddr_in6 *) addr)->sin6_scope_id);
     } else {
-		// Needs to set an error number. We need a function that will 
-		// do the reverse of our sock_error() function.
+		set_error(EAFNOSUPPORT); // Address family not supported
         return SOCKET_ERROR;
     }
     rc = setsockopt(p->sp_socket, optlvl, option, optval, optlen);
@@ -286,8 +281,7 @@ int SetMulticastTTL(PANEL *p, int ttl) {
 
     rc = setsockopt(p->sp_socket, level, ttl_opt, ttl_val, ttl_len);
     if (rc == SOCKET_ERROR) {
-		// Needs to set an error number. We need a function that will 
-		// do the reverse of our sock_error() function.
+		set_error(EAFNOSUPPORT); // Address family not supported
         return SOCKET_ERROR;
     }
 
@@ -318,8 +312,7 @@ int SetMulticastLoopback(PANEL *p, int loopval) {
         optval = (char *) &loopval;
         optlen = sizeof (loopval);
     } else {
-		// Needs to set an error number. We need a function that will 
-		// do the reverse of our sock_error() function.
+		set_error(EAFNOSUPPORT); // Address family not supported
         return SOCKET_ERROR;
     }
 

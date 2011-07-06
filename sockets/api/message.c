@@ -23,15 +23,6 @@ int announce(char* d_port, int magic) {
   int socket = INVALID_SOCKET;
   int rc = 0;
 
-#ifdef _WIN32
-  // Open Winsock
-  WSADATA wsd;
-  rc = WSAStartup(MAKEWORD(1, 1), &wsd);
-  if (rc != 0) {
-    goto err;
-  }
-#endif
-
   hs = CreateBoundPanel(MULTICAST_PORT, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(!hs) {
     goto err;
@@ -99,10 +90,6 @@ int announce(char* d_port, int magic) {
   return socket;
 
  err:
-#ifdef _WIN32
-  // Close Winsock
-  WSACleanup();
-#endif
   if (hs) {
     FreePanel(hs);
   }

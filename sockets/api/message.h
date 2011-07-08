@@ -36,16 +36,16 @@ int announce(char* d_port, int magic);
 int locate(int magic);
 
 /*
- * sendmsg()
+ * sendmsg_withlength()
  * 
  * this function will send a message of raw bytes of a certain length
  * across the socket, by first sending the length in a fixed value
  * "header", then sending the buffer.
  */
-int sendmsg(int socket, char* buffer, uint16_t length);
+int sendmsg_withlength(int socket, char* buffer, uint16_t length);
 
 /*
- * recvmsg()
+ * recvmsg_withlength()
  *
  * this function will receive a message from the socket
  * and put its value into the buffer. It will return an
@@ -55,4 +55,4 @@ int sendmsg(int socket, char* buffer, uint16_t length);
  * it will modify the length value to be the actual
  * length of the message returned.
  */
-int recvmsg(int socket, char* buffer, uint16_t* length);
+int recvmsg_withlength(int socket, char* buffer, uint16_t* length);

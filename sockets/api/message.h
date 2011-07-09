@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <netdb.h>
 #include <errno.h>
+typedef int SOCKET;
+#define FALSE 0
+#define TRUE 1
 #endif
 #include <stdint.h>
 #include <stdio.h>
@@ -42,7 +45,7 @@ int locate(int magic);
  * across the socket, by first sending the length in a fixed value
  * "header", then sending the buffer.
  */
-int sendmsg_withlength(int socket, char* buffer, uint16_t length);
+int sendmsg_withlength(SOCKET socket, char* buffer, uint16_t length);
 
 /*
  * recvmsg_withlength()
@@ -55,4 +58,4 @@ int sendmsg_withlength(int socket, char* buffer, uint16_t length);
  * it will modify the length value to be the actual
  * length of the message returned.
  */
-int recvmsg_withlength(int socket, char* buffer, uint16_t* length);
+int recvmsg_withlength(SOCKET socket, char* buffer, uint16_t* length);

@@ -22,13 +22,15 @@ extern "C" {
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <WinError.h>
+#include "stdint.h"
+#define EAFNOSUPPORT    97      /* Address family not supported by protocol */ /* Win32 doesn't have this, I don't know why */
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <netdb.h>
-#endif
 #include <stdint.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

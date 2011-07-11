@@ -27,7 +27,7 @@ typedef int SOCKET;
  *
  * Returns a socket
  */
-int announce(char* d_port, int magic);
+SOCKET announce(char* d_port, int magic);
 
 /*
  * locate()
@@ -37,7 +37,7 @@ int announce(char* d_port, int magic);
  * 
  * Returns a socket
  */
-int locate(int magic);
+SOCKET locate(int magic);
 
 /*
  * sendmsg_withlength()

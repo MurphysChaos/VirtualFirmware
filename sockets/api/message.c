@@ -261,7 +261,7 @@ int recvmsg_withlength(SOCKET socket, void* data, uint16_t* length)
 	 * the same amount as specified
 	 * in the msg_length
 	 */
-	rc = recv(socket, &data, msg_length, 0);
+	rc = recv(socket, data, msg_length, 0);
 	if (rc == 0) {
 		set_error(ECANCELED);
 		return -1;

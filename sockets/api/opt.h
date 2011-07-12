@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
-#define OPTRC "optrc"
+const char *OPTRC = "optrc";
 #define OPTBUFLEN 1024
 
 /*
@@ -16,4 +17,4 @@ struct {
     char tcpport[6];
 } OPT;
 
-void ReadOptions();
+void ReadOptions(const char *filename);

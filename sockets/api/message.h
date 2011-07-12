@@ -46,7 +46,7 @@ SOCKET locate(uint32_t magic);
  * across the socket, by first sending the length in a fixed value
  * "header", then sending the buffer.
  */
-int sendmsg_withlength(SOCKET socket, char* buffer, uint16_t length);
+int sendmsg_withlength(SOCKET socket, void* data, uint16_t length);
 
 /*
  * recvmsg_withlength()
@@ -59,4 +59,4 @@ int sendmsg_withlength(SOCKET socket, char* buffer, uint16_t length);
  * it will modify the length value to be the actual
  * length of the message returned.
  */
-int recvmsg_withlength(SOCKET socket, char* buffer, uint16_t* length);
+int recvmsg_withlength(SOCKET socket, void* data, uint16_t* length);

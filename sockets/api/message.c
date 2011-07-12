@@ -184,28 +184,31 @@ SOCKET locate(int magic) {
 
 int sendmsg_withlength(SOCKET socket, void* data, uint16_t length)
 {
-	int disconnect = FALSE;
-	uint16_t nRemainSend;
-	uint16_t nXfer;
-	uint16_t num_to_send;
+	int rc = 0;
+	uint16_t net_length = htons(length);
 
-	nRemainSend = sizeof(uint16_t);
-	num_to_send = htons(length);
-	while (nRemainSend > 0 && !disconnect)  {
-		nXfer = send(socket, (char*)&num_to_send, sizeof(uint16_t), 0);
-		disconnect = (nXfer == 0);
-		nRemainSend -=nXfer;
+	if (length <= 0) {
+		set_error(EINVAL);
+		return -1;
 	}
 
-	nRemainSend = length;
-	while (nRemainSend > 0 && !disconnect)  {
-		nXfer = send (socket, data, nRemainSend, 0);
-		disconnect = (nXfer == 0);
-		nRemainSend -=nXfer;
-		data += nXfer;
+	rc = send(socket, &net_length, sizeof(uint16_t));
+	if (rc == 0) {
+		set_error(ECANCELED);
+		return -1;
+	} else if (rc < 0) {
+		return -1;
 	}
 
-	return disconnect;
+	rc = send(socket, data, length);
+	if (rc == 0) {
+		set_error(ECANCELED);
+		return -1;
+	} else if (rc < 0) {
+		return rc;
+	}
+
+	return rc;
 }
 
 int recvmsg_withlength(SOCKET socket, void* data, uint16_t* length)

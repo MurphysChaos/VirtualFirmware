@@ -723,40 +723,6 @@ struct e1000_tx_desc {
 #define E1000_TCTL_NRTU   0x02000000    /* No Re-transmit on underrun */
 #define E1000_TCTL_MULR   0x10000000    /* Multiple request support */
 
-/* Admin Queue registers */
-#define E1000_PF_ATQBAH   0x06000       /* Base address high */
-#define E1000_PF_ATQBAL   0x06004       /* Base address low */
-#define E1000_PF_ATQLEN   0x06008       /* Ring length */
-#define E1000_PF_ATQH     0x0600C       /* Ring Head */
-#define E1000_PF_ATQT     0x06010       /* Ring Tail */
-
-enum e1000_admin_queue_cmd {
-	e1000_aqc_get_version	= 0x0001,
-};
-
-/*
- * Basic adminq descriptor
- */
-struct e1000_aq_desc {
-        uint16_t flags;
-        uint16_t opcode;
-        uint16_t datalen;
-        uint16_t retval;
-        uint32_t cookie_high;
-        uint32_t cookie_low;
-        uint32_t addr_high;
-        uint32_t addr_low;
-        uint32_t param0;
-        uint32_t param1;
-};
-
-#define E1000_AQ_FLAG_DD	(1 << 0)
-
-enum e1000_admin_queue_err {
-	E1000_AQ_RC_OK		= 0,
-	E1000_AQ_RC_ENOSYS	= 1,
-};
-
 /* Receive Descriptor */
 struct e1000_rx_desc {
     uint64_t buffer_addr; /* Address of the descriptor's data buffer */

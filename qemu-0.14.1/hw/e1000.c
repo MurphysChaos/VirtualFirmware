@@ -306,51 +306,6 @@ flash_eerd_read(E1000State *s, int x)
            E1000_EEPROM_RW_REG_DONE | r);
 }
 
-static void e1000_aq_get_version(struct e1000_aq_desc *desc)
-{
-#define FW_MAJ_TEMP 0x34
-#define FW_MIN_TEMP 0x13
-#define API_MAJ_TEMP 0xfa
-#define API_MIN_TEMP 0xaf
-	desc->param0 = (FW_MAJ_TEMP);
-	desc->param0 |= ((FW_MIN_TEMP << 16));
-	desc->param1 = (API_MAJ_TEMP);
-	desc->param1 |= ((API_MIN_TEMP << 16));
-}
-
-static void e1000_set_atq_tail(E1000State *s, int index, uint32_t val)
-{
-	target_phys_addr_t base;
-	struct e1000_aq_desc desc;
-
-	/* save the new tail value */
-	s->mac_reg[index] = val;
-
-	/* this write triggers action */
-	base = ((uint64_t)s->mac_reg[E1000_PF_ATQBAH] << 32) +
-	        s->mac_reg[E1000_PF_ATQBAL] + sizeof(struct e1000_aq_desc) *
-	        s->mac_reg[E1000_PF_ATQH];
-
-	cpu_physical_memory_read(base, (void *)&desc, sizeof(desc));
-
-	// process
-	switch (desc.opcode) {
-	case e1000_aqc_get_version:
-		e1000_aq_get_version(&desc);
-		break;
-	default:
-		desc.retval = E1000_AQ_RC_ENOSYS;
-		break;
-	}
-
-	// writeback descriptor
-	desc.flags |= E1000_AQ_FLAG_DD;
-	cpu_physical_memory_write(base, (void *)&desc, sizeof(desc));
-
-	if (++s->mac_reg[E1000_PF_ATQH] >= s->mac_reg[E1000_PF_ATQLEN])
-		s->mac_reg[E1000_PF_ATQH] = 0;
-}
-
 static void
 putsum(uint8_t *data, uint32_t n, uint32_t sloc, uint32_t css, uint32_t cse)
 {
@@ -878,11 +833,6 @@ static uint32_t (*macreg_readops[])(E1000State *, int) = {
     [RA ... RA+31] = &mac_readreg,
     [MTA ... MTA+127] = &mac_readreg,
     [VFTA ... VFTA+127] = &mac_readreg,
-    [E1000_PF_ATQBAH] = &mac_readreg,
-    [E1000_PF_ATQBAL] = &mac_readreg,
-    [E1000_PF_ATQLEN] = &mac_readreg,
-    [E1000_PF_ATQH] = &mac_readreg,
-    [E1000_PF_ATQT] = &mac_readreg,
 };
 enum { NREADOPS = ARRAY_SIZE(macreg_readops) };
 
@@ -899,11 +849,6 @@ static void (*macreg_writeops[])(E1000State *, int, uint32_t) = {
     [RA ... RA+31] = &mac_writereg,
     [MTA ... MTA+127] = &mac_writereg,
     [VFTA ... VFTA+127] = &mac_writereg,
-    [E1000_PF_ATQBAH] = &mac_writereg,
-    [E1000_PF_ATQBAL] = &mac_writereg,
-    [E1000_PF_ATQLEN] = &mac_writereg,
-    [E1000_PF_ATQH] = &mac_writereg,
-    [E1000_PF_ATQT] = &e1000_set_atq_tail,
 };
 enum { NWRITEOPS = ARRAY_SIZE(macreg_writeops) };
 

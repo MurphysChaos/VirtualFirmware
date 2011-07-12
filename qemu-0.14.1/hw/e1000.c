@@ -24,7 +24,7 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 
-
+#include <stdio.h>
 #include "hw.h"
 #include "pci.h"
 #include "net.h"
@@ -35,6 +35,8 @@
 #include "e1000_hw.h"
 
 #define E1000_DEBUG
+
+FILE *e1000_log = NULL;
 
 #ifdef E1000_DEBUG
 enum {
@@ -137,7 +139,8 @@ enum {
     defreg(TORH),	defreg(TORL),	defreg(TOTH),	defreg(TOTL),
     defreg(TPR),	defreg(TPT),	defreg(TXDCTL),	defreg(WUFC),
     defreg(RA),		defreg(MTA),	defreg(CRCERRS),defreg(VFTA),
-    defreg(VET),
+    defreg(VET),	defreg(PF_ATQLEN), defreg(PF_ATQT),
+    defreg(PF_ATQH),	defreg(PF_ATQBAH), defreg(PF_ATQBAL),
 };
 
 enum { PHY_R = 1, PHY_W = 2, PHY_RW = PHY_R | PHY_W };
@@ -304,6 +307,93 @@ flash_eerd_read(E1000State *s, int x)
 
     return ((s->eeprom_data[index] << E1000_EEPROM_RW_REG_DATA) |
            E1000_EEPROM_RW_REG_DONE | r);
+}
+
+static void e1000_aq_get_version(struct e1000_aq_desc *desc)
+{
+	fprintf(e1000_log, "in aq_get_version!\n");
+#define FW_MAJ_TEMP 0x34
+#define FW_MIN_TEMP 0x13
+#define API_MAJ_TEMP 0xfa
+#define API_MIN_TEMP 0xaf
+	desc->param0 = (FW_MAJ_TEMP);
+	desc->param0 |= ((FW_MIN_TEMP << 16));
+	desc->param1 = (API_MAJ_TEMP);
+	desc->param1 |= ((API_MIN_TEMP << 16));
+}
+
+static void e1000_aq_echo(struct e1000_aq_desc *desc)
+{
+	target_phys_addr_t in_buf;
+	uint8_t *my_buf;
+
+	fprintf(e1000_log, "%s\n", __func__);
+
+	if (desc->datalen != 0) {
+		/* create my local buffer */
+		my_buf = qemu_malloc(desc->datalen);
+		
+		/* copyin the indirect buffer */
+		in_buf = ((uint64_t)(desc->addr_high) << 32) | desc->addr_low;
+		my_buf = qemu_malloc(desc->datalen);
+		if (!my_buf) {
+			desc->flags |= E1000_AQ_FLAG_ERR;
+			desc->retval = ENOSPC;
+			goto echo_done;
+		}
+
+		/* copy into a local buffer */
+		cpu_physical_memory_read(in_buf, (void *)my_buf, desc->datalen);
+
+		/* pretend we've done something interesting */
+
+		/* copy back to the user's buffer */
+		cpu_physical_memory_write(in_buf, (void *)my_buf, desc->datalen);
+
+		/* goodbye local buffer */
+		qemu_free(my_buf);
+	}
+echo_done:
+	return;
+}
+
+static void e1000_set_atq_tail(E1000State *s, int index, uint32_t val)
+{
+	target_phys_addr_t base;
+	struct e1000_aq_desc desc;
+	uint16_t ring_len;
+
+	/* save the new tail value */
+	s->mac_reg[index] = val;
+
+	/* this write triggers action */
+	base = ((uint64_t)s->mac_reg[PF_ATQBAH] << 32) +
+	        s->mac_reg[PF_ATQBAL] + sizeof(struct e1000_aq_desc) *
+	        s->mac_reg[PF_ATQH];
+
+	cpu_physical_memory_read(base, (void *)&desc, sizeof(desc));
+
+	fprintf(e1000_log, "%s: command 0x%02x\n", __func__, desc.opcode);
+	// process
+	switch (desc.opcode) {
+	case e1000_aqc_get_version:
+		e1000_aq_get_version(&desc);
+		break;
+	case e1000_aqc_echo:
+		e1000_aq_echo(&desc);
+		break;
+	default:
+		desc.retval = E1000_AQ_RC_ENOSYS;
+		break;
+	}
+
+	// writeback descriptor
+	desc.flags |= E1000_AQ_FLAG_DD;
+	cpu_physical_memory_write(base, (void *)&desc, sizeof(desc));
+
+	ring_len = s->mac_reg[PF_ATQLEN] & ~E1000_PF_ATQLEN_ATQENABLE_MASK;
+	if (++s->mac_reg[PF_ATQH] >= ring_len)
+		s->mac_reg[PF_ATQH] = 0;
 }
 
 static void
@@ -833,6 +923,12 @@ static uint32_t (*macreg_readops[])(E1000State *, int) = {
     [RA ... RA+31] = &mac_readreg,
     [MTA ... MTA+127] = &mac_readreg,
     [VFTA ... VFTA+127] = &mac_readreg,
+    [PF_ATQBAH] = &mac_readreg,
+    [PF_ATQBAL] = &mac_readreg,
+    [PF_ATQLEN] = &mac_readreg,
+    [PF_ATQH] = &mac_readreg,
+    [PF_ATQT] = &mac_readreg,
+
 };
 enum { NREADOPS = ARRAY_SIZE(macreg_readops) };
 
@@ -849,6 +945,11 @@ static void (*macreg_writeops[])(E1000State *, int, uint32_t) = {
     [RA ... RA+31] = &mac_writereg,
     [MTA ... MTA+127] = &mac_writereg,
     [VFTA ... VFTA+127] = &mac_writereg,
+    [PF_ATQBAH] = &mac_writereg,
+    [PF_ATQBAL] = &mac_writereg,
+    [PF_ATQLEN] = &mac_writereg,
+    [PF_ATQH] = &mac_writereg,
+    [PF_ATQT] = &e1000_set_atq_tail,
 };
 enum { NWRITEOPS = ARRAY_SIZE(macreg_writeops) };
 
@@ -1075,6 +1176,8 @@ static int
 pci_e1000_uninit(PCIDevice *dev)
 {
     E1000State *d = DO_UPCAST(E1000State, dev, dev);
+    fprintf(e1000_log, "Logging ended.\n");
+    fclose(e1000_log);
 
     cpu_unregister_io_memory(d->mmio_index);
     qemu_del_vlan_client(&d->nic->nc);
@@ -1109,6 +1212,14 @@ static int pci_e1000_init(PCIDevice *pci_dev)
     uint16_t checksum = 0;
     int i;
     uint8_t *macaddr;
+
+    if (e1000_log == NULL) {
+	    e1000_log = fopen("/tmp/e1000_qemu.log", "a");
+	    setvbuf(e1000_log, NULL, _IONBF, 0);
+	    fprintf(e1000_log, "Logging started.\n");
+    } else {
+	    fprintf(e1000_log, "Logging re-started.\n");
+    }
 
     pci_conf = d->dev.config;
 

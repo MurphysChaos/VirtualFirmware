@@ -10,7 +10,7 @@ struct announce_msg {
 #define MULTICAST_PORT "9751"
 #define UDP_TTL 1
 
-SOCKET announce(char* d_port, int magic) {
+SOCKET announce(char* d_port, uint32_t magic) {
   PANEL* hs;
   PANEL* cs;
 
@@ -101,7 +101,7 @@ SOCKET announce(char* d_port, int magic) {
   return INVALID_SOCKET;
 }
 
-SOCKET locate(int magic) {
+SOCKET locate(uint32_t magic) {
   PANEL* hs;
   PANEL* cs;
 

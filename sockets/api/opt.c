@@ -6,11 +6,15 @@
  * <token>=<value>.
  */
 
-void ReadOptions(const char *filename = OPTRC) {
+void ReadOptions(const char *filename) {
     FILE *f = NULL;
     char line[OPTBUFLEN];
     char *eqpos;
     
+    if (filename == NULL) {
+	    filename = OPTRC;
+    }
+
     OPT.mcastip[0] = '\0';
     OPT.mcastport[0] = '\0';
     OPT.tcpport[0] = '\0';

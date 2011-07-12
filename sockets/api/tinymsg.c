@@ -26,12 +26,16 @@ int main(int argc, char** argv) {
   int socket;
   
   int rc;
-  
+  uint16_t msg_size = MAX_MSGSIZE;
+
   char buffer[MAX_MSGSIZE + 1];
-  char msg[MAX_MSGSIZE + 1] = "Hello, this is the client!";
+  char msg[MAX_MSGSIZE + 1];
   
   ProcessArgs(argc, argv);
-  memset(buffer, 0, sizeof(MAX_MSGSIZE) + 1);
+  memset(buffer, 0, MAX_MSGSIZE + 1);
+  memset(msg, 0, MAX_MSGSIZE + 1);
+
+  strcpy(msg, "Hello, this is the client!");
 
   if (bIsServer) {
     socket = announce(PORT, MAGIC);
@@ -39,7 +43,7 @@ int main(int argc, char** argv) {
       goto err;
     }
 
-    rc = recv(socket, buffer, MAX_MSGSIZE, 0);
+    rc = recvmsg_withlength(socket, buffer, &msg_size);
     if (rc == SOCKET_ERROR) {
       goto err;
     }
@@ -51,7 +55,7 @@ int main(int argc, char** argv) {
       goto err;
     }
     
-    rc = send(socket, msg, strlen(msg), 0);
+    rc = sendmsg_withlength(socket, msg, strlen(msg));
     if (rc == SOCKET_ERROR) {
       goto err;
     }

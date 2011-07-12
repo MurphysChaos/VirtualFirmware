@@ -65,13 +65,13 @@ extern "C" {
  */
 typedef struct socket_panel {
     uint32_t sp_socket;
-	struct sockaddr sp_bind;
-	struct sockaddr sp_dest;
-	uint32_t sp_family;
-	uint32_t sp_socktype;
-	uint32_t sp_protocol;
-	uint16_t sp_flags;
-	uint16_t sp_zero;
+    struct sockaddr sp_bind;
+    struct sockaddr sp_dest;
+    uint32_t sp_family;
+    uint32_t sp_socktype;
+    uint32_t sp_protocol;
+    uint16_t sp_flags;
+    uint16_t sp_zero;
 } SOCKET_PANEL, PANEL;
 
 /*
@@ -79,9 +79,9 @@ typedef struct socket_panel {
  * which port the TCP socket is listening on.
  */
 typedef struct sp_announce {
-	uint32_t sp_magic;
-	uint16_t sp_port;
-	uint16_t zero;
+    uint32_t sp_magic;
+    uint16_t sp_port;
+    uint16_t zero;
 } SP_ANNOUNCE;
 
 /* Functions for creating socket panels. */

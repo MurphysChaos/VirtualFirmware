@@ -6,7 +6,7 @@
  * <token>=<value>.
  */
 
-void ReadOptions() {
+void ReadOptions(const char *filename = OPTRC) {
     FILE *f = NULL;
     char line[OPTBUFLEN];
     char *eqpos;
@@ -16,7 +16,7 @@ void ReadOptions() {
     OPT.tcpport[0] = '\0';
     OPT.magicnum = 0;
     
-    f = fopen(OPTRC, "r");
+    f = fopen(filename, "r");
     if (f) {
         while (!feof(f)) {
             fscanf(f, "%s\n", line);
@@ -40,6 +40,7 @@ void ReadOptions() {
     }
 }
 
+#if 0
 int main() {
     ReadOptions();
     if (OPT.mcastip[0] != '\0') {
@@ -57,3 +58,4 @@ int main() {
     
     return 0;
 }
+#endif

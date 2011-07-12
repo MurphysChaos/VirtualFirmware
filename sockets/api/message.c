@@ -10,7 +10,7 @@ struct announce_msg {
 #define MULTICAST_PORT "9751"
 #define UDP_TTL 1
 
-int announce(char* d_port, int magic) {
+SOCKET announce(char* d_port, int magic) {
   PANEL* hs;
   PANEL* cs;
 
@@ -20,7 +20,7 @@ int announce(char* d_port, int magic) {
   
   int acceptlen;
 
-  int socket = INVALID_SOCKET;
+  SOCKET socket = INVALID_SOCKET;
   int rc = 0;
 
   hs = CreateBoundPanel(MULTICAST_PORT, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -101,7 +101,7 @@ int announce(char* d_port, int magic) {
   return INVALID_SOCKET;
 }
 
-int locate(int magic) {
+SOCKET locate(int magic) {
   PANEL* hs;
   PANEL* cs;
 
@@ -111,7 +111,7 @@ int locate(int magic) {
   
   int recvlen;
 
-  int socket = INVALID_SOCKET;
+  SOCKET socket = INVALID_SOCKET;
   int rc = 0;
 
   hs = CreateBoundPanel(MULTICAST_PORT, AF_INET, SOCK_DGRAM, IPPROTO_UDP);

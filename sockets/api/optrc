@@ -1,0 +1,6 @@
+#panel configuration file
+#lines must be <token>=<value> without spaces. All other lines ignored.
+mcastip=234.1.1.10
+mcastport=9751
+tcpport=9752
+magicnum=7734

@@ -8,6 +8,9 @@ LDFLAGS = -L. -lmessage -lpanel -lsockerr -lopt
 tinymsg: $(LIBS) tinymsg.o
 	$(CC) $(CFLAGS) tinymsg.o $(LDFLAGS) -o $@
 
+opt_test: $(LIBS) opt_test.o
+	$(CC) $(CFLAGS) opt_test.o $(LDFLAGS) -o $@
+
 lib%.a : %.o
 	$(AR) $@ $<
 

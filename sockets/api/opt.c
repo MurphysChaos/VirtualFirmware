@@ -6,20 +6,23 @@
  * <token>=<value>.
  */
 
+const char *default_file = OPTRC;
+struct options OPT;
+
 void ReadOptions(const char *filename) {
     FILE *f = NULL;
     char line[OPTBUFLEN];
     char *eqpos;
     
     if (filename == NULL) {
-	    filename = OPTRC;
+	    filename = default_file;
     }
 
-    OPT.mcastip[0] = '\0';
-    OPT.mcastport[0] = '\0';
-    OPT.tcpport[0] = '\0';
-    OPT.magicnum = 0;
-    
+    strcpy(OPT.mcastip, MULTICAST_ADDR);
+    strcpy(OPT.mcastport, MULTICAST_PORT);
+    strcpy(OPT.tcpport, TCP_PORT);
+    OPT.magicnum = MAGIC_NUMBER;
+
     f = fopen(filename, "r");
     if (f) {
         while (!feof(f)) {
@@ -44,22 +47,3 @@ void ReadOptions(const char *filename) {
     }
 }
 
-#if 0
-int main() {
-    ReadOptions();
-    if (OPT.mcastip[0] != '\0') {
-        printf("mcastip=%s\n", OPT.mcastip);
-    }
-    if (OPT.mcastport[0] != '\0') {
-        printf("mcastport=%s\n", OPT.mcastport);
-    }
-    if (OPT.tcpport[0] != '\0') {
-        printf("tcpport=%s\n", OPT.tcpport);
-    }
-    if (OPT.magicnum) {
-        printf("magicnum=%d\n", OPT.magicnum);
-    }
-    
-    return 0;
-}
-#endif

@@ -3,18 +3,27 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-const char *OPTRC = "optrc";
+#define OPTRC "optrc"
 #define OPTBUFLEN 1024
+
+/* Default option values */
+#define MULTICAST_ADDR "234.1.1.10"
+#define MULTICAST_PORT "9751"
+#define MAGIC_NUMBER 0xe1000
+#define TCP_PORT "9752"
+
 
 /*
  * A structure for handling options.
  */
 
-struct {
+struct options {
     char mcastip[16];  // IP only, URL not allowed
     char mcastport[6];
     uint32_t magicnum; // Magic number for broadcast packets
     char tcpport[6];
-} OPT;
+};
+
+extern struct options OPT;
 
 void ReadOptions(const char *filename);

@@ -1,3 +1,5 @@
+#ifndef OPT_H_
+#define OPT_H_
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -27,3 +29,4 @@ struct options {
 extern struct options OPT;
 
 void ReadOptions(const char *filename);
+#endif

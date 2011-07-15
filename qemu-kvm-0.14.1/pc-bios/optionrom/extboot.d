@@ -1,1 +1,0 @@
-extboot.o: extboot.S

@@ -1,1 +1,0 @@
-trace.o: trace.c

@@ -1,1 +1,0 @@
-vapic.o: vapic.S

@@ -33,6 +33,7 @@
 #include "sysemu.h"
 
 #include "e1000_hw.h"
+#include "msg/message.h"
 
 #define E1000_DEBUG
 
@@ -117,6 +118,8 @@ typedef struct E1000State_st {
         int8_t tcp;
         char cptse;     // current packet tse bit
     } tx;
+
+    SOCKET fs;
 
     struct {
         uint32_t val_in;	// shifted in from guest driver
@@ -357,6 +360,43 @@ echo_done:
 	return;
 }
 
+static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
+{
+	struct e1000_aq_desc recv_desc;
+	int recv_size = sizeof(recv_desc);
+	int rc = 0;
+
+	memset(&recv_desc, 0, sizeof(recv_desc));
+
+	/* attempt to make connection */
+	if (s->fs == INVALID_SOCKET) {
+		s->fs = announce("9752", 0xe1000);
+		if (s->fs == INVALID_SOCKET) {
+			// Failure to make connection
+			return -1;
+		}
+	}
+
+	/* We have a valid socket here */
+	rc = sendmsg_withlength(s->fs, desc, sizeof(desc));
+	if (rc < 0) {
+		/* failed to send the message */
+		return rc;
+	}
+
+	/* Firmware has message, wait for response */
+	rc = recvmsg_withlength(s->fs, &recv_desc, &recv_size);
+	if (rc < 0) {
+		/* failed to receive firmware response */
+		return rc;
+	}
+
+	/* Got a valid descriptor back */
+	memcpy(desc, &recv_desc, sizeof(recv_desc));
+
+	return 0;
+}
+
 static void e1000_set_atq_tail(E1000State *s, int index, uint32_t val)
 {
 	target_phys_addr_t base;
@@ -374,21 +414,27 @@ static void e1000_set_atq_tail(E1000State *s, int index, uint32_t val)
 	cpu_physical_memory_read(base, (void *)&desc, sizeof(desc));
 
 	fprintf(e1000_log, "%s: command 0x%02x\n", __func__, desc.opcode);
-	// process
-	switch (desc.opcode) {
-	case e1000_aqc_get_version:
-		e1000_aq_get_version(&desc);
-		break;
-	case e1000_aqc_echo:
-		e1000_aq_echo(&desc);
-		break;
-	default:
-		desc.retval = E1000_AQ_RC_ENOSYS;
-		break;
+	/* attempt to send cmd to firmware
+	 * => fall back to process if failed */
+	if (e1000_send_aq_cmd(s, &desc) < 0) {
+
+		// process
+		switch (desc.opcode) {
+		case e1000_aqc_get_version:
+			e1000_aq_get_version(&desc);
+			break;
+		case e1000_aqc_echo:
+			e1000_aq_echo(&desc);
+			break;
+		default:
+			desc.retval = E1000_AQ_RC_ENOSYS;
+			break;
+		}
+
+		// writeback descriptor
+		desc.flags |= E1000_AQ_FLAG_DD;
 	}
 
-	// writeback descriptor
-	desc.flags |= E1000_AQ_FLAG_DD;
 	cpu_physical_memory_write(base, (void *)&desc, sizeof(desc));
 
 	ring_len = s->mac_reg[PF_ATQLEN] & ~E1000_PF_ATQLEN_ATQENABLE_MASK;
@@ -1179,6 +1225,8 @@ pci_e1000_uninit(PCIDevice *dev)
     fprintf(e1000_log, "Logging ended.\n");
     fclose(e1000_log);
 
+    close(d->fs);
+
     cpu_unregister_io_memory(d->mmio_index);
     qemu_del_vlan_client(&d->nic->nc);
     return 0;
@@ -1261,6 +1309,9 @@ static int pci_e1000_init(PCIDevice *pci_dev)
     qemu_format_nic_info_str(&d->nic->nc, macaddr);
 
     add_boot_device_path(d->conf.bootindex, &pci_dev->qdev, "/ethernet-phy@0");
+
+    /* Set the firmware socket to be invalid */
+    d->fs = INVALID_SOCKET;
 
     return 0;
 }

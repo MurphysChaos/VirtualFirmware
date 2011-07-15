@@ -16,7 +16,11 @@ e1000.o: /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/e1000.c \
  ../net/queue.h ../net/checksum.h \
  /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/loader.h ../sysemu.h \
  ../qemu-timer.h ../notify.h ../qemu-os-posix.h \
- /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/e1000_hw.h
+ /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/e1000_hw.h \
+ /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/msg/message.h \
+ /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/msg/panel.h \
+ /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/msg/sockerr.h \
+ /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/msg/wsa_strerror.h
 
 /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/hw.h:
 
@@ -99,3 +103,11 @@ e1000.o: /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/e1000.c \
 ../qemu-os-posix.h:
 
 /u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/e1000_hw.h:
+
+/u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/msg/message.h:
+
+/u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/msg/panel.h:
+
+/u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/msg/sockerr.h:
+
+/u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/hw/msg/wsa_strerror.h:

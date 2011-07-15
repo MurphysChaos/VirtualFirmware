@@ -27,7 +27,7 @@ typedef int SOCKET;
  *
  * Returns a socket
  */
-SOCKET announce(char* d_port, uint32_t magic);
+SOCKET announce(const char* d_port, uint32_t magic);
 
 /*
  * locate()

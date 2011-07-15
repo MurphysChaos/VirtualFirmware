@@ -17,7 +17,7 @@ extern "C" {
 #include "wsa_strerror.h"
 
 void set_error(int err);
-const char* sock_error();
+const char* sock_error(void);
 
 #ifdef _cplusplus
 }

@@ -13,7 +13,7 @@
 
 /* Used as a helper function to create the "pre-zeroed" panel.
  */
-PANEL *CreateEmptyPanel() {
+PANEL *CreateEmptyPanel(void) {
     PANEL *p = NULL;
     size_t ps = sizeof (PANEL);
 
@@ -52,7 +52,7 @@ PANEL *CreatePanel(int af, int type, int proto) {
  * socket will listen on all active interfaces. Use CreatePanel() then 
  * BindPanel() to listen on a specific interface.
  */
-PANEL *CreateBoundPanel(char *svc, int af, int type, int proto) {
+PANEL *CreateBoundPanel(const char *svc, int af, int type, int proto) {
     PANEL *p = CreatePanel(af, type, proto);
     int rc, optval = -1;
 
@@ -112,7 +112,7 @@ void DissociatePanel(PANEL* p) {
  * Returns NULL on error. Use freeaddrinfo() on the return result after 
  * you are done with it.
  */
-struct addrinfo *ResolveAddr(char *addr, char *svc, int af, int type, int proto) {
+struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af, int type, int proto) {
     struct addrinfo hints, *res = NULL;
 	int rc;
 
@@ -133,7 +133,7 @@ struct addrinfo *ResolveAddr(char *addr, char *svc, int af, int type, int proto)
 /* Causes a panel to bind to the stored bind address. Must be used on a 
  * valid panel.
  */
-int BindPanel(PANEL *p, char *addr, char *svc) {
+int BindPanel(PANEL *p, const char *addr, const char *svc) {
 	struct addrinfo *ai = NULL;
 	int rc;
 
@@ -157,7 +157,7 @@ int BindPanel(PANEL *p, char *addr, char *svc) {
 
 /* Aligns outgoing traffic for the panel. Must be used on a valid panel.
  */
-int SetDestination(PANEL *p, char *addr, char *svc) {
+int SetDestination(PANEL *p, const char *addr, const char *svc) {
 	struct addrinfo *ai = NULL;
 
 	if (sp_getflag(p->sp_flags, SP_F_VALID)) {
@@ -245,7 +245,7 @@ int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr) {
         // IPv6 send interface parameters
 		optlvl = IPPROTO_IPV6;
         option = IPV6_MULTICAST_IF;
-        optval = (char *) (((struct sockaddr_in6 *) addr)->sin6_scope_id);
+        optval = (char *) &(((struct sockaddr_in6 *) addr)->sin6_scope_id);
         optlen = sizeof (((struct sockaddr_in6 *) addr)->sin6_scope_id);
     } else {
 		set_error(EAFNOSUPPORT); // Address family not supported

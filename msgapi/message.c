@@ -11,14 +11,14 @@ struct announce_msg {
 #define UDP_TTL 1
 
 SOCKET announce(char* d_port, uint32_t magic) {
-  PANEL* hs;
-  PANEL* cs;
+  PANEL* hs = NULL;
+  PANEL* cs = NULL;
 
   fd_set readfds;
   struct timeval tv;
   struct announce_msg m;
   
-  int acceptlen;
+  socklen_t acceptlen;
 
   SOCKET socket = INVALID_SOCKET;
   int rc = 0;
@@ -102,14 +102,12 @@ SOCKET announce(char* d_port, uint32_t magic) {
 }
 
 SOCKET locate(uint32_t magic) {
-  PANEL* hs;
-  PANEL* cs;
+  PANEL* hs = NULL;
+  PANEL* cs = NULL;
 
-  fd_set readfds;
-  struct timeval tv;
   struct announce_msg m;
   
-  int recvlen;
+  socklen_t recvlen;
 
   SOCKET socket = INVALID_SOCKET;
   int rc = 0;

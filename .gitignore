@@ -1,0 +1,19 @@
+# DO NOT DELETE THIS FILE.
+# The files listed here are protected by copyright. Transmission or 
+# duplication of protected files is expressly forbidden.
+
+readme_threadx.txt
+readme_threadx_generic.txt
+ThreadX_Express_Startup.pdf
+ThreadX_User_Guide.pdf
+tx.lib
+vf_tx/tx_api.h
+vf_tx/tx_port.h
+
+# Visual Studio solution files may be distributed but are unnecessary
+# for compiling the code.
+
+demo_tx.ncb
+demo_tx.sdf
+demo_tx.sln
+demo_tx.suo

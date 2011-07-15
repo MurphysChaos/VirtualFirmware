@@ -17,3 +17,7 @@ vf_tx/tx_port.h
 *.sdf
 *.sln
 *.suo
+
+# QEMU ignores
+qemu-kvm-0.14.1/hw/msg
+qemu-kvm-0.14.1/hw/msg/*

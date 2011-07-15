@@ -30,6 +30,8 @@ extern "C" {
 #include <stdlib.h>
 #include <netdb.h>
 #include <stdint.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 #endif
 #include <stdio.h>
 #include <string.h>
@@ -85,17 +87,17 @@ typedef struct sp_announce {
 } SP_ANNOUNCE;
 
 /* Functions for creating socket panels. */
-PANEL *CreateEmptyPanel();
+PANEL *CreateEmptyPanel(void);
 PANEL *CreatePanel(int af, int type, int proto);
-PANEL *CreateBoundPanel(char *svc, int af, int type, int proto);
+PANEL *CreateBoundPanel(const char *svc, int af, int type, int proto);
 PANEL *SocketToPanel(int s, struct sockaddr *addr);
 void FreePanel(PANEL *p);
 void DissociatePanel(PANEL *p);
 /* == UTILITY FUNCTIONS */
-struct addrinfo *ResolveAddr(char *addr, char *svc, int af, int type, int proto);
+struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af, int type, int proto);
 /* == MANIPULATOR FUNCTIONS */
-int BindPanel(PANEL *p, char *addr, char *svc);
-int SetDestination(PANEL *p, char *addr, char *svc);
+int BindPanel(PANEL *p, const char *addr, const char *svc);
+int SetDestination(PANEL *p, const char *addr, const char *svc);
 /* -- Functions for multicasting */
 int MakeMulticast(PANEL *p);
 int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr);

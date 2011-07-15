@@ -15,7 +15,7 @@ void set_error(int err) {
 #endif
 }
 
-const char* sock_error() {
+const char* sock_error(void) {
   int errval = errno;
 #ifdef _WIN32
   return wsa_strerror(WSAGetLastError());

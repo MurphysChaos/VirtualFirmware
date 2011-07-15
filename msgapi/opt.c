@@ -14,6 +14,8 @@ void ReadOptions(const char *filename) {
     char line[OPTBUFLEN];
     char *eqpos;
     
+    int rc = 0;
+
     if (filename == NULL) {
 	    filename = default_file;
     }
@@ -26,8 +28,8 @@ void ReadOptions(const char *filename) {
     f = fopen(filename, "r");
     if (f) {
         while (!feof(f)) {
-            fscanf(f, "%s\n", line);
-            strtok(line, "#"); // Remove comment from string
+            rc = fscanf(f, "%s\n", line);
+	    strtok(line, "#"); // Remove comment from string
             eqpos = strchr(line, '=');
             if (eqpos) {
                 eqpos[0] = '\0';

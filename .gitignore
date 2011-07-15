@@ -13,7 +13,7 @@ vf_tx/tx_port.h
 # Visual Studio solution files may be distributed but are unnecessary
 # for compiling the code.
 
-demo_tx.ncb
-demo_tx.sdf
-demo_tx.sln
-demo_tx.suo
+*.ncb
+*.sdf
+*.sln
+*.suo

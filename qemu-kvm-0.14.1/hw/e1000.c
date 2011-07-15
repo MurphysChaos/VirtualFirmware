@@ -363,7 +363,7 @@ echo_done:
 static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 {
 	struct e1000_aq_desc recv_desc;
-	int recv_size = sizeof(recv_desc);
+	uint16_t recv_size = sizeof(recv_desc);
 	int rc = 0;
 
 	memset(&recv_desc, 0, sizeof(recv_desc));

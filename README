@@ -28,6 +28,19 @@ between the driver and firmware, outside the normal communications chain for
 QEMU networking.
 
 
+Requirements
+============
+This API was developed using Express Logic ThreadX RTOS. The following files 
+protected under a proprietary license and must be supplied by the developer:
+
+tx.lib
+tx_api.h
+tx_port.h
+
+The library should be put in the project's root folder and the headers 
+should be put in the vf_tx folder.
+
+
 About the Software Engineering Capstone
 =======================================
 

@@ -17,3 +17,6 @@ vf_tx/tx_port.h
 *.sdf
 *.sln
 *.suo
+
+# Adding a hard link to the msgapi folder
+qemu-kvm-0.14.1/hw/msg

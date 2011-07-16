@@ -15,8 +15,10 @@ typedef int SOCKET;
 #define TRUE 1
 #endif
 #include <stdio.h>
+#include <sys/time.h>
 #include "panel.h"
 #include "sockerr.h"
+#include "opt.h"
 
 /*
  * anounce()
@@ -27,7 +29,7 @@ typedef int SOCKET;
  *
  * Returns a socket
  */
-SOCKET announce(const char* d_port, uint32_t magic);
+SOCKET announce(const char *optrc);
 
 /*
  * locate()
@@ -37,7 +39,7 @@ SOCKET announce(const char* d_port, uint32_t magic);
  * 
  * Returns a socket
  */
-SOCKET locate(uint32_t magic);
+SOCKET locate(const char *optrc);
 
 /*
  * sendmsg_withlength()

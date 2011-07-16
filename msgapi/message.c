@@ -6,16 +6,17 @@ struct announce_msg {
   uint16_t flags; // reserved
 };
 
-#define MULTICAST_ADDR "234.1.1.10"
-#define MULTICAST_PORT "9751"
-#define UDP_TTL 1
+#define PACKETS_PER_SEC 10
 
-SOCKET announce(const char* d_port, uint32_t magic) {
+SOCKET announce(const char *optrc) {
   PANEL* hs = NULL;
   PANEL* cs = NULL;
 
   fd_set readfds;
   struct timeval tv;
+  int num_packets = 0;
+  int count = 0;
+
   struct announce_msg m;
   
   socklen_t acceptlen;
@@ -23,12 +24,14 @@ SOCKET announce(const char* d_port, uint32_t magic) {
   SOCKET socket = INVALID_SOCKET;
   int rc = 0;
 
-  hs = CreateBoundPanel(MULTICAST_PORT, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  ReadOptions(optrc);
+
+  hs = CreateBoundPanel(OPT.mcastport, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(!hs) {
     goto err;
   }
 
-  rc = SetDestination(hs, MULTICAST_ADDR, MULTICAST_PORT);
+  rc = SetDestination(hs, OPT.mcastip, OPT.mcastport);
   if(rc == SOCKET_ERROR) {
     goto err;
   }
@@ -38,7 +41,7 @@ SOCKET announce(const char* d_port, uint32_t magic) {
     goto err;
   }
 
-  rc = SetMulticastTTL(hs, UDP_TTL);
+  rc = SetMulticastTTL(hs, OPT.mcastttl);
   if (rc == SOCKET_ERROR) {
     goto err;
   }
@@ -48,7 +51,7 @@ SOCKET announce(const char* d_port, uint32_t magic) {
     goto err;
   }
 
-  cs = CreateBoundPanel(d_port, AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  cs = CreateBoundPanel(OPT.tcpport, AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if(!cs) {
     goto err;
   }
@@ -57,12 +60,16 @@ SOCKET announce(const char* d_port, uint32_t magic) {
   if(rc == SOCKET_ERROR) {
     goto err;
   }
-  
-  /* Begin the main loop */
-  while(socket == INVALID_SOCKET) {
-    m.magic = htonl(magic);
-    m.port = htons(atoi(d_port));
-    
+
+  num_packets = OPT.timeout * PACKETS_PER_SEC;
+
+  /* the funny condition causes us to loop forever
+   * if we have a timeout of 0 */
+  for(count = 0; (num_packets == 0 || count < num_packets); count++) {
+    m.magic = htonl(OPT.magicnum);
+    m.port = htons(atoi(OPT.tcpport));
+    m.flags = 0;
+
     rc = sendto(hs->sp_socket, &m, sizeof(m), 0, &(hs->sp_dest), sizeof(hs->sp_dest));
     if (rc == SOCKET_ERROR) {
       goto err;
@@ -81,7 +88,8 @@ SOCKET announce(const char* d_port, uint32_t magic) {
     } else {
       acceptlen = sizeof(struct sockaddr);
       socket = accept(cs->sp_socket, &(cs->sp_dest), &acceptlen);
-     }
+      break;
+    }
   }
 
   FreePanel(hs);
@@ -101,9 +109,12 @@ SOCKET announce(const char* d_port, uint32_t magic) {
   return INVALID_SOCKET;
 }
 
-SOCKET locate(uint32_t magic) {
+SOCKET locate(const char *optrc) {
   PANEL* hs = NULL;
   PANEL* cs = NULL;
+
+  fd_set readfds;
+  struct timeval tv;
 
   struct announce_msg m;
   
@@ -112,12 +123,14 @@ SOCKET locate(uint32_t magic) {
   SOCKET socket = INVALID_SOCKET;
   int rc = 0;
 
-  hs = CreateBoundPanel(MULTICAST_PORT, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  ReadOptions(optrc);
+
+  hs = CreateBoundPanel(OPT.mcastport, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(!hs) {
     goto err;
   }
 
-  rc = SetDestination(hs, MULTICAST_ADDR, MULTICAST_PORT);
+  rc = SetDestination(hs, OPT.mcastip, OPT.mcastport);
   if(rc == SOCKET_ERROR) {
     goto err;
   }
@@ -127,7 +140,7 @@ SOCKET locate(uint32_t magic) {
     goto err;
   }
 
-  rc = SetMulticastTTL(hs, UDP_TTL);
+  rc = SetMulticastTTL(hs, OPT.mcastttl);
   if (rc == SOCKET_ERROR) {
     goto err;
   }
@@ -142,7 +155,23 @@ SOCKET locate(uint32_t magic) {
     goto err;
   }
 
+  tv.tv_sec = OPT.timeout;
+  tv.tv_usec = 0;
+
   while(socket == INVALID_SOCKET) {
+    FD_ZERO(&readfds);
+    FD_SET(hs->sp_socket, &readfds);
+
+    rc = select(hs->sp_socket + 1, &readfds, NULL, NULL, (OPT.timeout > 0 ? &tv : NULL));
+    if (rc < 0) {
+      goto err;
+    } else if (rc == 0) {
+      socket = INVALID_SOCKET;
+      break;
+    }
+
+    /* if we get here, select woke up with a valid packet */
+
     recvlen = sizeof(struct sockaddr);
     rc = recvfrom(hs->sp_socket, &m, sizeof(m), 0, &(cs->sp_dest), &recvlen);
     if (rc == SOCKET_ERROR) {
@@ -151,7 +180,7 @@ SOCKET locate(uint32_t magic) {
 
     m.magic = ntohl(m.magic);
 
-    if (m.magic == magic) {
+    if (m.magic == OPT.magicnum) {
       ((struct sockaddr_in *) &(cs->sp_dest))->sin_port = m.port;
       rc = connect(cs->sp_socket, &(cs->sp_dest), sizeof(struct sockaddr));
       if (rc == SOCKET_ERROR) {

@@ -17,14 +17,16 @@ void ReadOptions(const char *filename) {
     int rc = 0;
 
     if (filename == NULL) {
-	    filename = default_file;
+        filename = default_file;
     }
 
     strcpy(OPT.mcastip, MULTICAST_ADDR);
     strcpy(OPT.mcastport, MULTICAST_PORT);
     strcpy(OPT.tcpport, TCP_PORT);
+    OPT.mcastttl = MULTICAST_TTL;
     OPT.magicnum = MAGIC_NUMBER;
-
+    OPT.timeout = CONNECT_TIMEOUT;
+    
     f = fopen(filename, "r");
     if (f) {
         while (!feof(f)) {
@@ -35,14 +37,18 @@ void ReadOptions(const char *filename) {
                 eqpos[0] = '\0';
                 
                 if (strcmp(line, "mcastip") == 0) {
-                    strcpy(OPT.mcastip, eqpos+1);
+		    strcpy(OPT.mcastip, eqpos+1);
                 } else if (strcmp(line, "mcastport") == 0) {
-                    strcpy(OPT.mcastport, eqpos+1);
+		     strcpy(OPT.mcastport, eqpos+1);
+		} else if (strcmp(line, "mcastttl") == 0) {
+		     OPT.mcastttl = atoi(eqpos + 1);
                 } else if (strcmp(line, "tcpport") == 0) {
-                    strcpy(OPT.tcpport, eqpos+1);
+		     strcpy(OPT.tcpport, eqpos+1);
                 } else if (strcmp(line, "magicnum") == 0) {
                     OPT.magicnum = atoi(eqpos + 1);
-                }
+                } else if (strcmp(line, "timeout") == 0) {
+		    OPT.timeout = atoi(eqpos + 1);
+		}
             }
         }
         fclose(f);

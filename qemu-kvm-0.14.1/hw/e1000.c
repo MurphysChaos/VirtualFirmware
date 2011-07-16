@@ -370,7 +370,7 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 
 	/* attempt to make connection */
 	if (s->fs == INVALID_SOCKET) {
-		s->fs = announce("9752", 0xe1000);
+		s->fs = locate(0xe1000);
 		if (s->fs == INVALID_SOCKET) {
 			// Failure to make connection
 			return -1;

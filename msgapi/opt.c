@@ -25,6 +25,7 @@ void ReadOptions(const char *filename) {
     strcpy(OPT.tcpport, TCP_PORT);
     OPT.mcastttl = MULTICAST_TTL;
     OPT.magicnum = MAGIC_NUMBER;
+    OPT.timeout = CONNECT_TIMEOUT;
     
     f = fopen(filename, "r");
     if (f) {
@@ -45,7 +46,9 @@ void ReadOptions(const char *filename) {
 		     strcpy(OPT.tcpport, eqpos+1);
                 } else if (strcmp(line, "magicnum") == 0) {
                     OPT.magicnum = atoi(eqpos + 1);
-                }
+                } else if (strcmp(line, "timeout") == 0) {
+		    OPT.timeout = atoi(eqpos + 1);
+		}
             }
         }
         fclose(f);

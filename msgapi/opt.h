@@ -14,6 +14,7 @@
 #define MULTICAST_TTL 1
 #define MAGIC_NUMBER 0xe1000
 #define TCP_PORT "9752"
+#define CONNECT_TIMEOUT 10
 
 /*
  * A structure for handling options.
@@ -25,6 +26,7 @@ struct options {
     int mcastttl;
     uint32_t magicnum; // Magic number for broadcast packets
     char tcpport[6];
+    int timeout;
 };
 
 extern struct options OPT;

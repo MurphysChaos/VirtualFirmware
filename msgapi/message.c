@@ -6,12 +6,17 @@ struct announce_msg {
   uint16_t flags; // reserved
 };
 
+#define PACKETS_PER_SEC 10
+
 SOCKET announce(const char *optrc) {
   PANEL* hs = NULL;
   PANEL* cs = NULL;
 
   fd_set readfds;
   struct timeval tv;
+  int num_packets = 0;
+  int count = 0;
+
   struct announce_msg m;
   
   socklen_t acceptlen;
@@ -55,12 +60,16 @@ SOCKET announce(const char *optrc) {
   if(rc == SOCKET_ERROR) {
     goto err;
   }
-  
-  /* Begin the main loop */
-  while(socket == INVALID_SOCKET) {
+
+  num_packets = OPT.timeout * PACKETS_PER_SEC;
+
+  /* the funny condition causes us to loop forever
+   * if we have a timeout of 0 */
+  for(count = 0; (num_packets == 0 || count < num_packets); count++) {
     m.magic = htonl(OPT.magicnum);
     m.port = htons(atoi(OPT.tcpport));
-    
+    m.flags = 0;
+
     rc = sendto(hs->sp_socket, &m, sizeof(m), 0, &(hs->sp_dest), sizeof(hs->sp_dest));
     if (rc == SOCKET_ERROR) {
       goto err;
@@ -79,7 +88,8 @@ SOCKET announce(const char *optrc) {
     } else {
       acceptlen = sizeof(struct sockaddr);
       socket = accept(cs->sp_socket, &(cs->sp_dest), &acceptlen);
-     }
+      break;
+    }
   }
 
   FreePanel(hs);
@@ -102,6 +112,9 @@ SOCKET announce(const char *optrc) {
 SOCKET locate(const char *optrc) {
   PANEL* hs = NULL;
   PANEL* cs = NULL;
+
+  fd_set readfds;
+  struct timeval tv;
 
   struct announce_msg m;
   
@@ -142,7 +155,23 @@ SOCKET locate(const char *optrc) {
     goto err;
   }
 
+  tv.tv_sec = OPT.timeout;
+  tv.tv_usec = 0;
+
   while(socket == INVALID_SOCKET) {
+    FD_ZERO(&readfds);
+    FD_SET(hs->sp_socket, &readfds);
+
+    rc = select(hs->sp_socket + 1, &readfds, NULL, NULL, (OPT.timeout > 0 ? &tv : NULL));
+    if (rc < 0) {
+      goto err;
+    } else if (rc == 0) {
+      socket = INVALID_SOCKET;
+      break;
+    }
+
+    /* if we get here, select woke up with a valid packet */
+
     recvlen = sizeof(struct sockaddr);
     rc = recvfrom(hs->sp_socket, &m, sizeof(m), 0, &(cs->sp_dest), &recvlen);
     if (rc == SOCKET_ERROR) {

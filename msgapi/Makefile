@@ -5,6 +5,9 @@ OBJECTS = panel.o sockerr.o tinymsg.o opt.o
 LIBS = libpanel.a libsockerr.a libmessage.a libopt.a
 LDFLAGS = -L. -lmessage -lpanel -lsockerr -lopt
 
+linux_test_client: $(LIBS) linux_test_client.o
+	$(CC) $(CFLAGS) linux_test_client.o $(LDFLAGS) -o $@
+
 tinymsg: $(LIBS) tinymsg.o
 	$(CC) $(CFLAGS) tinymsg.o $(LDFLAGS) -o $@
 

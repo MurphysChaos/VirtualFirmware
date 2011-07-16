@@ -1,4 +1,5 @@
 #ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
 #pragma comment(lib, "Ws2_32.lib")
 #include <WinSock2.h>
 #include <WS2tcpip.h>
@@ -10,12 +11,12 @@
 #include <netdb.h>
 #include <errno.h>
 #include <stdint.h>
+#include <sys/time.h>
 typedef int SOCKET;
 #define FALSE 0
 #define TRUE 1
 #endif
 #include <stdio.h>
-#include <sys/time.h>
 #include "panel.h"
 #include "sockerr.h"
 #include "opt.h"

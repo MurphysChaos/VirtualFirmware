@@ -2,8 +2,7 @@
 
 int bIsServer = 0;
 
-#define PORT "9752"
-#define MAGIC 0x6A38937
+#define OPTRC_FILE "tinymsg.optrc"
 #define MAX_MSGSIZE 1024
 
 void ProcessArgs(int argc, char **argv)
@@ -38,7 +37,7 @@ int main(int argc, char** argv) {
   strcpy(msg, "Hello, this is the client!");
 
   if (bIsServer) {
-    socket = announce(PORT, MAGIC);
+    socket = announce(OPTRC_FILE);
     if (socket == INVALID_SOCKET) {
       goto err;
     }
@@ -50,7 +49,7 @@ int main(int argc, char** argv) {
 
     printf("%s\n", buffer);
   } else {
-    socket = locate(MAGIC);
+    socket = locate(OPTRC_FILE);
     if (socket == INVALID_SOCKET) {
       goto err;
     }

@@ -6,11 +6,7 @@ struct announce_msg {
   uint16_t flags; // reserved
 };
 
-#define MULTICAST_ADDR "234.1.1.10"
-#define MULTICAST_PORT "9751"
-#define UDP_TTL 1
-
-SOCKET announce(const char* d_port, uint32_t magic) {
+SOCKET announce(const char *optrc) {
   PANEL* hs = NULL;
   PANEL* cs = NULL;
 
@@ -23,12 +19,14 @@ SOCKET announce(const char* d_port, uint32_t magic) {
   SOCKET socket = INVALID_SOCKET;
   int rc = 0;
 
-  hs = CreateBoundPanel(MULTICAST_PORT, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  ReadOptions(optrc);
+
+  hs = CreateBoundPanel(OPT.mcastport, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(!hs) {
     goto err;
   }
 
-  rc = SetDestination(hs, MULTICAST_ADDR, MULTICAST_PORT);
+  rc = SetDestination(hs, OPT.mcastip, OPT.mcastport);
   if(rc == SOCKET_ERROR) {
     goto err;
   }
@@ -38,7 +36,7 @@ SOCKET announce(const char* d_port, uint32_t magic) {
     goto err;
   }
 
-  rc = SetMulticastTTL(hs, UDP_TTL);
+  rc = SetMulticastTTL(hs, OPT.mcastttl);
   if (rc == SOCKET_ERROR) {
     goto err;
   }
@@ -48,7 +46,7 @@ SOCKET announce(const char* d_port, uint32_t magic) {
     goto err;
   }
 
-  cs = CreateBoundPanel(d_port, AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  cs = CreateBoundPanel(OPT.tcpport, AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if(!cs) {
     goto err;
   }
@@ -60,8 +58,8 @@ SOCKET announce(const char* d_port, uint32_t magic) {
   
   /* Begin the main loop */
   while(socket == INVALID_SOCKET) {
-    m.magic = htonl(magic);
-    m.port = htons(atoi(d_port));
+    m.magic = htonl(OPT.magicnum);
+    m.port = htons(atoi(OPT.tcpport));
     
     rc = sendto(hs->sp_socket, &m, sizeof(m), 0, &(hs->sp_dest), sizeof(hs->sp_dest));
     if (rc == SOCKET_ERROR) {
@@ -101,7 +99,7 @@ SOCKET announce(const char* d_port, uint32_t magic) {
   return INVALID_SOCKET;
 }
 
-SOCKET locate(uint32_t magic) {
+SOCKET locate(const char *optrc) {
   PANEL* hs = NULL;
   PANEL* cs = NULL;
 
@@ -112,12 +110,14 @@ SOCKET locate(uint32_t magic) {
   SOCKET socket = INVALID_SOCKET;
   int rc = 0;
 
-  hs = CreateBoundPanel(MULTICAST_PORT, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  ReadOptions(optrc);
+
+  hs = CreateBoundPanel(OPT.mcastport, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(!hs) {
     goto err;
   }
 
-  rc = SetDestination(hs, MULTICAST_ADDR, MULTICAST_PORT);
+  rc = SetDestination(hs, OPT.mcastip, OPT.mcastport);
   if(rc == SOCKET_ERROR) {
     goto err;
   }
@@ -127,7 +127,7 @@ SOCKET locate(uint32_t magic) {
     goto err;
   }
 
-  rc = SetMulticastTTL(hs, UDP_TTL);
+  rc = SetMulticastTTL(hs, OPT.mcastttl);
   if (rc == SOCKET_ERROR) {
     goto err;
   }
@@ -151,7 +151,7 @@ SOCKET locate(uint32_t magic) {
 
     m.magic = ntohl(m.magic);
 
-    if (m.magic == magic) {
+    if (m.magic == OPT.magicnum) {
       ((struct sockaddr_in *) &(cs->sp_dest))->sin_port = m.port;
       rc = connect(cs->sp_socket, &(cs->sp_dest), sizeof(struct sockaddr));
       if (rc == SOCKET_ERROR) {

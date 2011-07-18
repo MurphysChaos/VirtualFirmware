@@ -15,6 +15,7 @@
 #define MAGIC_NUMBER 0xe1000
 #define TCP_PORT "9752"
 #define CONNECT_TIMEOUT 10
+#define DBGLVL 0
 
 /*
  * A structure for handling options.
@@ -27,6 +28,7 @@ struct options {
     uint32_t magicnum; // Magic number for broadcast packets
     char tcpport[6];
     int timeout;
+    int dbglvl;
 };
 
 extern struct options OPT;

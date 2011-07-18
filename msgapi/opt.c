@@ -26,10 +26,11 @@ void ReadOptions(const char *filename) {
     OPT.mcastttl = MULTICAST_TTL;
     OPT.magicnum = MAGIC_NUMBER;
     OPT.timeout = CONNECT_TIMEOUT;
+    OPT.dbglvl = DBGLVL;
     
     f = fopen(filename, "r");
     if (f) {
-        while (!feof(f)) {
+	while (!feof(f)) {
             rc = fscanf(f, "%s\n", line);
 	    strtok(line, "#"); // Remove comment from string
             eqpos = strchr(line, '=');
@@ -48,6 +49,8 @@ void ReadOptions(const char *filename) {
                     OPT.magicnum = atoi(eqpos + 1);
                 } else if (strcmp(line, "timeout") == 0) {
 		    OPT.timeout = atoi(eqpos + 1);
+		} else if (strcmp(line, "dbglvl") == 0) {
+		     OPT.dbglvl = atoi(eqpos + 1);
 		}
             }
         }

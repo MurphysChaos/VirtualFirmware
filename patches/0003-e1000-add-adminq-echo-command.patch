@@ -1,0 +1,107 @@
+From 243623fab01bdbb911dac6d671d591ae1ee64cde Mon Sep 17 00:00:00 2001
+From: Shannon Nelson <shannon.nelson@intel.com>
+Date: Mon, 11 Jul 2011 14:41:52 -0700
+Subject: [PATCH 3/3] e1000: add adminq echo command
+
+Add a command that sends an indirect buffer to the device and tests
+that the same contents come back.
+
+Signed-off-by: Shannon Nelson <shannon.nelson@intel.com>
+---
+ src/e1000_adminq.c |   46 +++++++++++++++++++++++++++++++++++++++++++++-
+ src/e1000_adminq.h |    1 +
+ 2 files changed, 46 insertions(+), 1 deletions(-)
+
+diff --git a/src/e1000_adminq.c b/src/e1000_adminq.c
+index 3608f1d..f7eba8f 100644
+--- a/src/e1000_adminq.c
++++ b/src/e1000_adminq.c
+@@ -300,11 +300,17 @@ enum e1000_admin_queue_err e1000_asq_send_command(struct e1000_hw *hw,
+ 
+ 	spin_lock(&hw->aq.asq_spinlock);
+ 
++#if 0
++/* 
++ * TODO: Debug why this is returning an error.  In the meantime,
++ *       this is not needed while all commands are synchronous
++ */
+ 	if (e1000_clean_asq(&(hw->aq.asq)) == 0) {
+ 		status = E1000_AQ_ERR_QUEUE_FULL;
+ 		goto asq_send_command_error;
+ 	}
+ 
++#endif
+ 	desc->flags |= cpu_to_le16(E1000_AQ_FLAG_SI);
+ 
+ 	/* initialize the temp desc pointer with the right desc */
+@@ -420,6 +426,42 @@ int e1000_aq_get_firmware_version(struct e1000_hw *hw, u16 *fw_major_version,
+ }
+ 
+ /**
++ *  e1000_aq_echo
++ *  @hw: pointer to the hw struct
++ *
++ *  Do an echo test of the communication path
++ **/
++int e1000_aq_echo(struct e1000_hw *hw)
++{
++	struct e1000_adapter *adapter = (struct e1000_adapter *)hw->back;
++	struct e1000_aq_desc desc;
++	enum e1000_admin_queue_err err;
++	u8 stackbuf[1024];  /* use stack for "random" content */
++	int buflen = sizeof(stackbuf);
++	u8 *adminq_buf;
++
++	e1000_fill_default_direct_cmd_desc(&desc, e1000_aqc_echo);
++
++	adminq_buf = kzalloc(buflen, GFP_KERNEL);
++	memcpy(adminq_buf, stackbuf, buflen);
++
++	err = e1000_asq_send_command(hw, &desc, adminq_buf, buflen);
++
++	if (err == E1000_AQ_RC_OK) {
++		int cp =  memcmp(adminq_buf, stackbuf, buflen);
++		if (cp != 0) {
++			DPRINTK(DRV, ERR, "echo data test failed, cp=%d\n", cp);
++		} else {
++			DPRINTK(DRV, ERR, "echo data test passwd\n");
++		}
++	} else {
++		DPRINTK(DRV, ERR, "Admin Queue failure: %d\n", err);
++	}
++
++	return E1000_SUCCESS;
++}
++
++/**
+  * e1000_adminq_cmd - force a command through the adminq
+  *  @hw: pointer to the hw struct
+  * @cmd: the command to test
+@@ -437,9 +479,11 @@ void e1000_adminq_cmd(struct e1000_hw *hw, int cmd)
+ 		DPRINTK(PROBE, INFO, "fw= %02x %02x  api= %02x %02x\n",
+ 		        fw_maj, fw_min, api_maj, api_min);
+ 		break;
+-	case 2: /* query */
++	case 3: /* echo */
++		e1000_aq_echo(hw);
+ 		break;
+ 	default:
++		DPRINTK(PROBE, INFO, "unknown firmware test command %d\n", cmd);
+ 		break;
+ 	}
+ }
+diff --git a/src/e1000_adminq.h b/src/e1000_adminq.h
+index 2c3d136..baa0cfa 100644
+--- a/src/e1000_adminq.h
++++ b/src/e1000_adminq.h
+@@ -35,6 +35,7 @@ enum e1000_admin_queue_cmd {
+ 	/* aq commands */
+ 	e1000_aqc_get_version 			= 0x0001,
+ 	e1000_aqc_driver_heartbeat		= 0x0002,
++	e1000_aqc_echo				= 0x0003,
+ };
+ 
+ /*
+-- 
+1.7.4.4
+

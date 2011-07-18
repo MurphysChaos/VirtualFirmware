@@ -1,0 +1,132 @@
+From 1b15d845c0645c324b6b3ff0f4cce904f1ae544a Mon Sep 17 00:00:00 2001
+From: Shannon Nelson <shannon.nelson@intel.com>
+Date: Mon, 11 Jul 2011 14:36:23 -0700
+Subject: [PATCH] e1000: add an indirect buffer adminq test
+
+Add a command to the AdminQ processor to demonstrate and test the indirect
+buffer handling.  This simply returns the indirect buffer that it was given.
+
+Signed-off-by: Shannon Nelson <shannon.nelson@intel.com>
+---
+ hw/e1000.c    |   40 +++++++++++++++++++++++++++++++++++++++-
+ hw/e1000_hw.h |   29 +++++++++++++++++++++++++++--
+ 2 files changed, 66 insertions(+), 3 deletions(-)
+
+diff --git a/hw/e1000.c b/hw/e1000.c
+index bc1ac61..3b12ebb 100644
+--- a/hw/e1000.c
++++ b/hw/e1000.c
+@@ -322,6 +322,41 @@ static void e1000_aq_get_version(struct e1000_aq_desc *desc)
+ 	desc->param1 |= ((API_MIN_TEMP << 16));
+ }
+ 
++static void e1000_aq_echo(struct e1000_aq_desc *desc)
++{
++	target_phys_addr_t in_buf;
++	uint8_t *my_buf;
++
++	fprintf(e1000_log, "%s\n", __func__);
++
++	if (desc->datalen != 0) {
++		/* create my local buffer */
++		my_buf = qemu_malloc(desc->datalen);
++		
++		/* copyin the indirect buffer */
++		in_buf = ((uint64_t)(desc->addr_high) << 32) | desc->addr_low;
++		my_buf = qemu_malloc(desc->datalen);
++		if (!my_buf) {
++			desc->flags |= E1000_AQ_FLAG_ERR;
++			desc->retval = ENOSPC;
++			goto echo_done;
++		}
++
++		/* copy into a local buffer */
++		cpu_physical_memory_read(in_buf, (void *)my_buf, desc->datalen);
++
++		/* pretend we've done something interesting */
++
++		/* copy back to the user's buffer */
++		cpu_physical_memory_write(in_buf, (void *)my_buf, desc->datalen);
++
++		/* goodbye local buffer */
++		qemu_free(my_buf);
++	}
++echo_done:
++	return;
++}
++
+ static void e1000_set_atq_tail(E1000State *s, int index, uint32_t val)
+ {
+ 	target_phys_addr_t base;
+@@ -338,17 +373,20 @@ static void e1000_set_atq_tail(E1000State *s, int index, uint32_t val)
+ 
+ 	cpu_physical_memory_read(base, (void *)&desc, sizeof(desc));
+ 
++	fprintf(e1000_log, "%s: command 0x%02x\n", __func__, desc.opcode);
+ 	// process
+ 	switch (desc.opcode) {
+ 	case e1000_aqc_get_version:
+ 		e1000_aq_get_version(&desc);
+ 		break;
++	case e1000_aqc_echo:
++		e1000_aq_echo(&desc);
++		break;
+ 	default:
+ 		desc.retval = E1000_AQ_RC_ENOSYS;
+ 		break;
+ 	}
+ 
+-fprintf(e1000_log, "param0: %x\n", desc.param0);
+ 	// writeback descriptor
+ 	desc.flags |= E1000_AQ_FLAG_DD;
+ 	cpu_physical_memory_write(base, (void *)&desc, sizeof(desc));
+diff --git a/hw/e1000_hw.h b/hw/e1000_hw.h
+index b10af62..c9c774e 100644
+--- a/hw/e1000_hw.h
++++ b/hw/e1000_hw.h
+@@ -744,7 +744,9 @@ struct e1000_tx_desc {
+ 
+ 
+ enum e1000_admin_queue_cmd {
+-	e1000_aqc_get_version	= 0x0001,
++	e1000_aqc_get_version		= 0x0001,
++	e1000_aqc_driver_heartbeat	= 0x0002,
++	e1000_aqc_echo			= 0x0003,
+ };
+ 
+ /*
+@@ -763,7 +765,30 @@ struct e1000_aq_desc {
+         uint32_t addr_low;
+ };
+ 
+-#define E1000_AQ_FLAG_DD	(1 << 0)
++/* command flags and offsets */
++#define E1000_AQ_FLAG_DD_OFF_SHIFT	0
++#define E1000_AQ_FLAG_CMP_OFF_SHIFT	1
++#define E1000_AQ_FLAG_ERR_OFF_SHIFT	2
++#define E1000_AQ_FLAG_VFE_OFF_SHIFT	3
++#define E1000_AQ_FLAG_LB_OFF_SHIFT	4
++#define E1000_AQ_FLAG_RD_OFF_SHIFT	0xA
++#define E1000_AQ_FLAG_VFC_OFF_SHIFT	0xB
++#define E1000_AQ_FLAG_BUF_OFF_SHIFT	0xC
++#define E1000_AQ_FLAG_SI_OFF_SHIFT	0xD
++#define E1000_AQ_FLAG_EI_OFF_SHIFT	0xE
++#define E1000_AQ_FLAG_FE_OFF_SHIFT	0xF
++
++#define E1000_AQ_FLAG_DD		(1 << E1000_AQ_FLAG_DD_OFF_SHIFT)
++#define E1000_AQ_FLAG_CMP 		(1 << E1000_AQ_FLAG_CMP_OFF_SHIFT)
++#define E1000_AQ_FLAG_ERR		(1 << E1000_AQ_FLAG_ERR_OFF_SHIFT)
++#define E1000_AQ_FLAG_VFE		(1 << E1000_AQ_FLAG_VFE_OFF_SHIFT)
++#define E1000_AQ_FLAG_LB		(1 << E1000_AQ_FLAG_LB_OFF_SHIFT)
++#define E1000_AQ_FLAG_RD		(1 << E1000_AQ_FLAG_RD_OFF_SHIFT)
++#define E1000_AQ_FLAG_VFC		(1 << E1000_AQ_FLAG_VFC_OFF_SHIFT)
++#define E1000_AQ_FLAG_BUF		(1 << E1000_AQ_FLAG_BUF_OFF_SHIFT)
++#define E1000_AQ_FLAG_SI		(1 << E1000_AQ_FLAG_SI_OFF_SHIFT)
++#define E1000_AQ_FLAG_EI		(1 << E1000_AQ_FLAG_EI_OFF_SHIFT)
++#define E1000_AQ_FLAG_FE		(1 << E1000_AQ_FLAG_FE_OFF_SHIFT)
+ 
+ enum e1000_admin_queue_err {
+ 	E1000_AQ_RC_OK		= 0,
+-- 
+1.7.4.4
+

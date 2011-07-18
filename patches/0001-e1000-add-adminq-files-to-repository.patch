@@ -1,0 +1,613 @@
+From 90741ab8835bf01ac35f3f472dabfda51c64796d Mon Sep 17 00:00:00 2001
+From: Shannon Nelson <shannon.nelson@intel.com>
+Date: Mon, 11 Jul 2011 11:59:31 -0700
+Subject: [PATCH 1/3] e1000: add adminq files to repository
+
+Add the adminq files to git for change tracking
+
+Signed-off-by: Shannon Nelson <shannon.nelson@intel.com>
+---
+ src/e1000_adminq.c |  421 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ src/e1000_adminq.h |  162 ++++++++++++++++++++
+ 2 files changed, 583 insertions(+), 0 deletions(-)
+ create mode 100644 src/e1000_adminq.c
+ create mode 100644 src/e1000_adminq.h
+
+diff --git a/src/e1000_adminq.c b/src/e1000_adminq.c
+new file mode 100644
+index 0000000..4d3e4f2
+--- /dev/null
++++ b/src/e1000_adminq.c
+@@ -0,0 +1,421 @@
++/*******************************************************************************
++
++  Intel 1 Gigabit PCI Express Linux driver
++  Copyright(c) 1999 - 2011 Intel Corporation.
++
++  This program is free software; you can redistribute it and/or modify it
++  under the terms and conditions of the GNU General Public License,
++  version 2, as published by the Free Software Foundation.
++
++  This program is distributed in the hope it will be useful, but WITHOUT
++  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++  more details.
++
++  You should have received a copy of the GNU General Public License along with
++  this program; if not, write to the Free Software Foundation, Inc.,
++  51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
++
++  The full GNU General Public License is included in this distribution in
++  the file called "COPYING".
++
++  Contact Information:
++  e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
++  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
++
++*******************************************************************************/
++
++#include <linux/module.h>
++#include "e1000_hw.h"
++#include "e1000_adminq.h"
++#include "e1000.h"
++
++/* prototype */
++int e1000_aq_get_firmware_version(struct e1000_hw *hw, u16 *fw_major_version,
++                                  u16 *fw_minor_version, u16 *api_major_version,
++                                  u16 *api_minor_version);
++
++/**
++ *  e1000_alloc_adminq_rings - Allocate Admin Queue send and receive rings.
++ *  @hw:     pointer to the hardware structure
++ *
++ *  Depth of the queues is expected to be set by the caller in the
++ *  adminq_info struct in the e1000_hw struct.
++ **/
++static int e1000_alloc_adminq_rings(struct e1000_hw *hw) {
++	struct e1000_adapter *adapter = (struct e1000_adapter *)hw->back;
++	struct pci_dev *pdev = adapter->pdev;
++	int ret_code = E1000_SUCCESS;
++
++	/* First allocate the descriptor ring memory */
++	hw->aq.asq.desc = dma_alloc_coherent(pci_dev_to_dev(pdev),
++	                                     (hw->aq.num_asq_entries *
++	                                      sizeof(struct e1000_aq_desc)),
++	                                      &hw->aq.asq.dma, GFP_KERNEL);
++	if (!hw->aq.asq.desc || !hw->aq.asq.dma) {
++		ret_code = -ENOMEM;
++		goto alloc_aq_rings_exit;
++	}
++
++	/* set head and tail registers in our local struct */
++	hw->aq.asq.tail = E1000_PF_ATQT;
++	hw->aq.asq.head = E1000_PF_ATQH;
++	hw->aq.asq.count = hw->aq.num_asq_entries;
++	hw->aq.asq.next_to_use = 0;
++
++alloc_aq_rings_exit:
++	return ret_code;
++}
++
++/**
++ *  e1000_free_adminq_rings - Free Admin Queue send and receive rings.
++ *  @hw:     pointer to the hardware structure
++ *
++ *  This assumes the posted receive buffers have already been cleaned
++ *  and de-allocated.
++ **/
++static void e1000_free_adminq_rings(struct e1000_hw *hw) {
++	struct e1000_adapter *adapter = (struct e1000_adapter *)hw->back;
++	dma_free_coherent(&adapter->pdev->dev,
++	                  (hw->aq.num_asq_entries *
++	                   sizeof(struct e1000_aq_desc)),
++	                  hw->aq.asq.desc, hw->aq.asq.dma);
++	dma_free_coherent(&adapter->pdev->dev,
++	                  (hw->aq.num_arq_entries *
++	                   sizeof(struct e1000_aq_desc)),
++	                  hw->aq.arq.desc, hw->aq.arq.dma);
++}
++
++/**
++ *  e1000_alloc_asq_bufs - Allocate empty buffer structs for the send queue
++ *  @hw:     pointer to the hardware structure
++ **/
++static int e1000_alloc_asq_bufs(struct e1000_hw *hw) {
++	struct e1000_adapter *adapter = (struct e1000_adapter *)hw->back;
++	struct pci_dev *pdev = adapter->pdev;
++	struct e1000_aq_bi *bi;
++	int i;
++
++	/* No mapped memory needed yet, just the buffer info structures */
++	hw->aq.asq.asq_bi = vmalloc(hw->aq.num_asq_entries *
++	                            sizeof(struct e1000_aq_bi));
++
++	/* allocate the mapped buffers */
++	for (i = 0; i < hw->aq.num_asq_entries; i++) {
++		bi = &hw->aq.asq.asq_bi[i];
++		bi->buf = dma_alloc_coherent(pci_dev_to_dev(pdev),
++		                             hw->aq.asq_buf_size,
++		                             &bi->dma, GFP_KERNEL);
++		bi->size = hw->aq.asq_buf_size;
++	}
++
++	return E1000_SUCCESS;
++}
++
++/**
++ *  e1000_free_asq_bufs - Free send queue buffer info elements
++ *  @hw:     pointer to the hardware structure
++ **/
++static void e1000_free_asq_bufs(struct e1000_hw *hw) {
++	struct e1000_adapter *adapter = (struct e1000_adapter *)hw->back;
++	struct pci_dev *pdev = adapter->pdev;
++	struct e1000_aq_bi *bi;
++	int i;
++
++	/* only unmap if the address is non-NULL */
++	for (i = 0; i < hw->aq.num_asq_entries; i++) {
++		bi = &hw->aq.asq.asq_bi[i];
++		if (bi->dma)
++			dma_free_coherent(pci_dev_to_dev(pdev),
++			                  hw->aq.asq_buf_size,
++		        	          bi->buf, bi->dma);
++	}
++
++	/* now free the buffer info list */
++	vfree(hw->aq.asq.asq_bi);
++}
++
++/**
++ *  e1000_alloc_adminq_bufs - Allocate buffers for the Admin Queues
++ *  @hw:     pointer to the hardware structure
++ **/
++static int e1000_alloc_adminq_bufs(struct e1000_hw *hw) {
++	int ret_code;
++
++	ret_code = e1000_alloc_asq_bufs(hw);
++
++	return ret_code;
++}
++
++/**
++ *  e1000_free_adminq_bufs - Free buffers in the Admin Queue rings
++ *  @hw:     pointer to the hardware structure
++ **/
++static void e1000_free_adminq_bufs(struct e1000_hw *hw) {
++	e1000_free_asq_bufs(hw);
++}
++
++/**
++ *  e1000_config_adminq_regs - Configure base address registers for the queues
++ *  @hw:     pointer to the hardware structure
++ **/
++static void e1000_config_adminq_regs(struct e1000_hw *hw) {
++	/* configure the transmit queue */
++	E1000_WRITE_REG(hw, E1000_PF_ATQBAH, (hw->aq.asq.dma >> 32));
++	E1000_WRITE_REG(hw, E1000_PF_ATQBAL, (hw->aq.asq.dma & 0xffffffff));
++	E1000_WRITE_REG(hw, E1000_PF_ATQLEN, (hw->aq.num_asq_entries |
++	                E1000_PF_ATQLEN_ATQENABLE_MASK));
++	E1000_WRITE_REG(hw, E1000_PF_ATQT, 0);
++	E1000_WRITE_REG(hw, E1000_PF_ATQH, 0);
++}
++
++/**
++ *  e1000_init_adminq - The main initialization routine for the Admin Queue.
++ *  @hw:     pointer to the hardware structure
++ *
++ *  Prior to calling this function, drivers *MUST* set the following fields
++ *  in the hw->aq structure:
++ *     - hw->aq.num_asq_entries
++ *     - hw->aq.asq_buf_size
++ **/
++int e1000_init_adminq(struct e1000_hw *hw) {
++	int ret_code;
++
++	/* verify input for valid configuration */
++	if ((hw->aq.num_asq_entries == 0) ||
++	    (hw->aq.asq_buf_size == 0)) {
++		ret_code = -1;
++		goto init_adminq_exit;
++	}
++
++	/* initialize spin locks */
++	spin_lock_init(&hw->aq.asq_spinlock);
++
++	/* allocate the ring memory */
++	ret_code = e1000_alloc_adminq_rings(hw);
++	if (ret_code != E1000_SUCCESS)
++		goto init_adminq_exit;
++
++	/* allocate buffers in the rings */
++	ret_code = e1000_alloc_adminq_bufs(hw);
++	if (ret_code != E1000_SUCCESS)
++		goto init_adminq_free_rings;
++
++	/* initialize base registers */
++	e1000_config_adminq_regs(hw);
++
++	e1000_aq_get_firmware_version(hw, &hw->aq.fw_maj_ver,
++	                              &hw->aq.fw_min_ver, &hw->aq.api_maj_ver,
++	                              &hw->aq.api_min_ver);
++printk(KERN_INFO "fw_maj: %x\n", hw->aq.fw_maj_ver);
++
++	/* success! */
++	goto init_adminq_exit;
++
++init_adminq_free_rings:
++	e1000_free_adminq_rings(hw);
++
++init_adminq_exit:
++	return ret_code;
++}
++
++/**
++ *  e1000_shutdown_adminq - The main shutdown routine for the Admin Queue.
++ *  @hw:     pointer to the hardware structure
++ **/
++int e1000_shutdown_adminq(struct e1000_hw *hw) {
++	int ret_code = E1000_SUCCESS;
++
++	/* make sure spinlock is available */
++	spin_lock(&hw->aq.asq_spinlock);
++
++	/* send heartbeat with message we're shutting down */
++
++	/* free ring buffers */
++	e1000_free_adminq_bufs(hw);
++
++	/* free the rings */
++	e1000_free_adminq_rings(hw);
++
++	spin_unlock(&hw->aq.asq_spinlock);
++
++	/* Clear PFATQLEN */
++	E1000_WRITE_REG(hw, E1000_PF_ATQLEN, 0);
++
++	return ret_code;
++}
++
++/**
++ *  e1000_clean_asq
++ *  @hw:     pointer to the admin send queue struct
++ *  returns the no. of clean desc that Sw can use
++ *  TODO: this function can be extended to handle asynchronous completes
++ *  and in which case could be called in an irq
++ **/
++u16 e1000_clean_asq(struct e1000_adminq_ring *asq)
++{
++	struct e1000_aq_desc *desc;
++	u16 i = asq->next_to_clean;
++	u16 flags;
++
++	desc = E1000_ADMINQ_DESC(*asq, i);
++	flags = le16_to_cpu(desc->flags);
++	while ((flags & E1000_AQ_FLAG_DD) > 0) {
++		memset((void *)desc, 0, sizeof(struct e1000_aq_desc));
++		i++;
++		desc = E1000_ADMINQ_DESC(*asq, i);
++		flags = le16_to_cpu(desc->flags);
++	}
++
++	asq->next_to_clean = i;
++
++	return E1000_DESC_UNUSED(asq);
++}
++
++/**
++ *  e1000_asq_send_command
++ *  @hw: pointer to the hw struct
++ *  @desc: prefilled descriptor describing the command (non DMA mem)
++ *  @buff: buffer to use for indirect commands
++ *  @buff_size: size of buffer for indirect commands
++ *
++ *  This is the main send command driver routine for the Admin Queue send
++ *  queue.  It runs the queue, cleans the queue, etc.
++ **/
++enum e1000_admin_queue_err e1000_asq_send_command(struct e1000_hw *hw,
++						  struct e1000_aq_desc *desc,
++						  void *buff, /* can be NULL */
++						  u16  buff_size)
++{
++	struct e1000_aq_desc *desc_on_ring;
++	struct e1000_aq_bi *bi = NULL;
++	enum e1000_admin_queue_err status = E1000_AQ_RC_OK;
++	u32 micro_sec;
++	bool cmd_completed = false;
++
++	if (buff_size > hw->aq.asq_buf_size) {
++		status = E1000_AQ_ERR_INVALID_BUFF_SIZE;
++		goto asq_send_command_error;
++	}
++
++	spin_lock(&hw->aq.asq_spinlock);
++
++	if (e1000_clean_asq(&(hw->aq.asq)) == 0) {
++		status = E1000_AQ_ERR_QUEUE_FULL;
++		goto asq_send_command_error;
++	}
++
++	desc->flags |= cpu_to_le16(E1000_AQ_FLAG_SI);
++
++	/* initialize the temp desc pointer with the right desc */
++	desc_on_ring = E1000_ADMINQ_DESC(hw->aq.asq, hw->aq.asq.next_to_use);
++
++	/* if the desc is available copy the temp desc to the right place */
++	memcpy(desc_on_ring, desc, sizeof(struct e1000_aq_desc));
++
++	/* if buff is not NULL assume indirect command */
++	if (buff != NULL) {
++		bi = &(hw->aq.asq.asq_bi[hw->aq.asq.next_to_use]);
++		memcpy(bi->buf, buff, buff_size);
++		desc_on_ring->datalen = cpu_to_le16(buff_size);
++
++		desc_on_ring->addr_high = cpu_to_le32((bi->dma >> 32));
++		desc_on_ring->addr_low = cpu_to_le32((bi->dma & 0xffffffff));
++	}
++
++	/* bump the tail */
++	(hw->aq.asq.next_to_use)++;
++	if (hw->aq.asq.next_to_use == hw->aq.asq.count)
++		hw->aq.asq.next_to_use = 0;
++	E1000_WRITE_REG(hw, E1000_PF_ATQT, hw->aq.asq.next_to_use);
++
++	micro_sec = 0;
++	do {
++		if (le16_to_cpu(desc_on_ring->flags) & E1000_AQ_FLAG_DD)
++			break;
++		udelay(1000);
++		micro_sec += 1000;
++	} while (micro_sec <  E1000_ASQ_CMD_TIMEOUT);
++
++	/* once dd bit set, copy the desc back to temp */
++	if (le16_to_cpu(desc_on_ring->flags) & E1000_AQ_FLAG_DD) {
++		memcpy(desc, desc_on_ring, sizeof(struct e1000_aq_desc));
++		if (buff != NULL)
++			memcpy(buff, bi->buf, buff_size);
++		status = (enum e1000_admin_queue_err)le16_to_cpu(desc->retval);
++		cmd_completed = true;
++	}
++
++	/* update the error if time out occured */
++	if (cmd_completed == false)
++		status = E1000_AQ_ERR_TIMEOUT;
++
++asq_send_command_error:
++	spin_unlock(&hw->aq.asq_spinlock);
++
++	return status;
++}
++
++/**
++ *  e1000_fill_default_direct_cmd_desc
++ *  helper function
++ *  @desc:     pointer to the temp descriptor (non DMA mem)
++ *  @opcode:   the opcode can be used to decide which flags to tunr off or on
++ *  Fill the desc with default values
++ **/
++void e1000_fill_default_direct_cmd_desc(struct e1000_aq_desc *desc,
++				        u16 opcode)
++{
++	static u64 cookie;
++	u16 flags = 0;
++
++	cookie++;
++	/* zero out the desc */
++	memset((void *)desc, 0, sizeof(struct e1000_aq_desc));
++
++	if (opcode == e1000_aqc_driver_heartbeat)
++		flags = E1000_AQ_FLAG_SI;
++
++	flags |= E1000_AQ_FLAG_EI;
++	flags |= E1000_AQ_FLAG_FE;
++
++	desc->opcode = cpu_to_le16(opcode);
++	desc->flags = cpu_to_le16(flags);
++	desc->cookie_high = cpu_to_le32((cookie >> 32));
++	desc->cookie_low = cpu_to_le32((cookie & 0xffffffff));
++}
++
++/**
++ *  e1000_aq_get_firmware_version
++ *  @hw: pointer to the hw struct
++ *  @fw_major_version:
++ *  @fw_minor_version:
++ *  @api_major_version:
++ *  @api_minor_version:
++ *
++ *  Retrieves the firmware version from the Admin Queue infrastructure
++ **/
++int e1000_aq_get_firmware_version(struct e1000_hw *hw, u16 *fw_major_version,
++                                  u16 *fw_minor_version, u16 *api_major_version,
++                                  u16 *api_minor_version)
++{
++	struct e1000_adapter *adapter = (struct e1000_adapter *)hw->back;
++	struct e1000_aq_desc desc;
++	enum e1000_admin_queue_err err;
++
++	e1000_fill_default_direct_cmd_desc(&desc, e1000_aqc_get_version);
++
++	err = e1000_asq_send_command(hw, &desc, NULL, 0);
++
++	if (err == E1000_AQ_RC_OK) {
++		*fw_major_version = le16_to_cpu((desc.param0 & 0xffff));
++		*fw_minor_version = le16_to_cpu((desc.param0 >> 16));
++		*api_major_version = le16_to_cpu((desc.param1 & 0xffff));
++		*api_minor_version = le16_to_cpu((desc.param1 >> 16));
++	} else {
++		DPRINTK(DRV, ERR, "Admin Queue failure: %d\n", err);
++	}
++
++	return E1000_SUCCESS;
++}
++
+diff --git a/src/e1000_adminq.h b/src/e1000_adminq.h
+new file mode 100644
+index 0000000..2c3d136
+--- /dev/null
++++ b/src/e1000_adminq.h
+@@ -0,0 +1,162 @@
++/*******************************************************************************
++
++  Intel 1 Gigabit PCI Express Linux driver
++  Copyright(c) 1999 - 2011 Intel Corporation.
++
++  This program is free software; you can redistribute it and/or modify it
++  under the terms and conditions of the GNU General Public License,
++  version 2, as published by the Free Software Foundation.
++
++  This program is distributed in the hope it will be useful, but WITHOUT
++  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++  more details.
++
++  You should have received a copy of the GNU General Public License along with
++  this program; if not, write to the Free Software Foundation, Inc.,
++  51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
++
++  The full GNU General Public License is included in this distribution in
++  the file called "COPYING".
++
++  Contact Information:
++  e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
++  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
++
++*******************************************************************************/
++
++#ifndef _E1000_ADMINQ_H_
++#define _E1000_ADMINQ_H_
++
++#include "e1000_hw.h"
++
++/* Admin Queue command opcodes */
++enum e1000_admin_queue_cmd {
++	/* aq commands */
++	e1000_aqc_get_version 			= 0x0001,
++	e1000_aqc_driver_heartbeat		= 0x0002,
++};
++
++/*
++ * Basic adminq descriptor
++ */
++struct e1000_aq_desc {
++	__le16 flags;
++	__le16 opcode;
++	__le16 datalen;
++	__le16 retval;
++	__le32 cookie_high;
++	__le32 cookie_low;
++	__le32 param0;
++	__le32 param1;
++	__le32 addr_high;
++	__le32 addr_low;
++};
++
++#define E1000_ADMINQ_DESC(R, i)   \
++	(&(((struct e1000_aq_desc *)((R).desc))[i]))
++
++#define E1000_ADMINQ_DESC_ALIGNMENT 4096
++struct e1000_adminq_ring {
++	void *desc;		/* Descriptor ring memory */
++
++	dma_addr_t dma;		/* Physical address of the ring */
++	u16 count;		/* Number of descriptors */
++	u16 rx_buf_len;		/* Admin Receive Queue buffer length */
++
++	struct e1000_aq_bi *asq_bi;
++
++	/* used for interrupt processing */
++	u16 next_to_use;
++	u16 next_to_clean;
++
++	/* used for queue tracking */
++	u32 head;
++	u32 tail;
++};
++
++struct e1000_aq_bi {
++	dma_addr_t dma;
++	void *buf;
++	u32 size;
++};
++
++/* general information */
++#define E1000_AQ_LARGE_BUF	512
++#define E1000_ASQ_CMD_TIMEOUT	100000 /* TODO - shrink later from KVM usage */
++
++/* error codes */
++enum e1000_admin_queue_err {
++	E1000_AQ_RC_OK =		0,	/* success */
++	E1000_AQ_RC_EPERM =	1,	/* Operation not permitted */
++	E1000_AQ_RC_ENOENT =	2,	/* No such element */
++	E1000_AQ_RC_ESRCH =	3,	/* Bad opcode */
++	E1000_AQ_RC_EINTR = 	4,	/* operation interrupted */
++	E1000_AQ_RC_EIO =	5,	/* I/O error */
++	E1000_AQ_RC_ENXIO =	6,	/* No such resource */
++	E1000_AQ_RC_E2BIG =	7,	/* Arg too long */
++	E1000_AQ_RC_EAGAIN =	8,	/* Try again */
++	E1000_AQ_RC_ENOMEM =	9,	/* Out of memory */
++	E1000_AQ_RC_EACCES =	10,	/* Permission denied */
++	E1000_AQ_RC_EFAULT =	11,	/* Bad address */
++	E1000_AQ_RC_EBUSY = 	12,	/* Device or resource busy */
++	E1000_AQ_RC_EEXIST =	13,	/* Attempt to create something that exists */
++	E1000_AQ_RC_EINVAL =	14,	/* Invalid argument */
++	E1000_AQ_RC_ENOTTY =	15,	/* Not a typewriter */
++	E1000_AQ_RC_ENOSPC =	16,	/* No space left or alloc failure */
++	E1000_AQ_RC_ENOSYS =	17,	/* Function not implemented */
++	E1000_AQ_RC_ERANGE =	18,	/* Parameter out of range */
++	E1000_AQ_RC_EFLUSHED =	19,	/* Command flushed because a previous
++						 command completed in error */
++	/* SW use if the command times out with no WB */
++	E1000_AQ_ERR_INVALID_BUFF_SIZE = 0xfffd,
++	E1000_AQ_ERR_QUEUE_FULL	=	0xfffe,
++	E1000_AQ_ERR_TIMEOUT =		0xffff
++};
++
++/* command flags and offsets */
++#define E1000_AQ_FLAG_DD_OFF_SHIFT	0
++#define E1000_AQ_FLAG_CMP_OFF_SHIFT	1
++#define E1000_AQ_FLAG_ERR_OFF_SHIFT	2
++#define E1000_AQ_FLAG_VFE_OFF_SHIFT	3
++#define E1000_AQ_FLAG_LB_OFF_SHIFT	4
++#define E1000_AQ_FLAG_RD_OFF_SHIFT	0xA
++#define E1000_AQ_FLAG_VFC_OFF_SHIFT	0xB
++#define E1000_AQ_FLAG_BUF_OFF_SHIFT	0xC
++#define E1000_AQ_FLAG_SI_OFF_SHIFT	0xD
++#define E1000_AQ_FLAG_EI_OFF_SHIFT	0xE
++#define E1000_AQ_FLAG_FE_OFF_SHIFT	0xF
++
++#define E1000_AQ_FLAG_DD		(1 << E1000_AQ_FLAG_DD_OFF_SHIFT)
++#define E1000_AQ_FLAG_CMP 		(1 << E1000_AQ_FLAG_CMP_OFF_SHIFT)
++#define E1000_AQ_FLAG_ERR		(1 << E1000_AQ_FLAG_ERR_OFF_SHIFT)
++#define E1000_AQ_FLAG_VFE		(1 << E1000_AQ_FLAG_VFE_OFF_SHIFT)
++#define E1000_AQ_FLAG_LB		(1 << E1000_AQ_FLAG_LB_OFF_SHIFT)
++#define E1000_AQ_FLAG_RD		(1 << E1000_AQ_FLAG_RD_OFF_SHIFT)
++#define E1000_AQ_FLAG_VFC		(1 << E1000_AQ_FLAG_VFC_OFF_SHIFT)
++#define E1000_AQ_FLAG_BUF		(1 << E1000_AQ_FLAG_BUF_OFF_SHIFT)
++#define E1000_AQ_FLAG_SI		(1 << E1000_AQ_FLAG_SI_OFF_SHIFT)
++#define E1000_AQ_FLAG_EI		(1 << E1000_AQ_FLAG_EI_OFF_SHIFT)
++#define E1000_AQ_FLAG_FE		(1 << E1000_AQ_FLAG_FE_OFF_SHIFT)
++
++#define E1000_PF_ATQBAH             	0x00006000
++#define E1000_PF_ATQBAH_ATQBAH_SHIFT	0
++#define E1000_PF_ATQBAH_ATQBAH_MASK 	(0xFFFFFFFF << E1000_PF_ATQBAH_ATQBAH_SHIFT)
++#define E1000_PF_ATQBAL             	0x00006004
++#define E1000_PF_ATQBAL_ATQBAL_SHIFT	0
++#define E1000_PF_ATQBAL_ATQBAL_MASK 	(0xFFFFFFFF << E1000_PF_ATQBAL_ATQBAL_SHIFT)
++#define E1000_PF_ATQH           	0x00006008
++#define E1000_PF_ATQH_ATQH_SHIFT	0
++#define E1000_PF_ATQH_ATQH_MASK 	(0x3FF << E1000_PF_ATQH_ATQH_SHIFT)
++#define E1000_PF_ATQLEN                	0x0000600C
++#define E1000_PF_ATQLEN_ATQLEN_SHIFT   	0
++#define E1000_PF_ATQLEN_ATQLEN_MASK    	(0x3FF << E1000_PF_ATQLEN_ATQLEN_SHIFT)
++#define E1000_PF_ATQLEN_ATQENABLE_SHIFT	31
++#define E1000_PF_ATQLEN_ATQENABLE_MASK 	(0x1 << E1000_PF_ATQLEN_ATQENABLE_SHIFT)
++#define E1000_PF_ATQT           	0x00006010
++#define E1000_PF_ATQT_ATQT_SHIFT	0
++#define E1000_PF_ATQT_ATQT_MASK 	(0x3FF << E1000_PF_ATQT_ATQT_SHIFT)
++
++/* command structures */
++
++#endif /* _E1000_ADMINQ_H_ */
+-- 
+1.7.4.4
+

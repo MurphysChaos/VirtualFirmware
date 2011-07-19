@@ -17,6 +17,7 @@ typedef int SOCKET;
 #define TRUE 1
 #endif
 #include <stdio.h>
+#include <stdarg.h>
 #include "panel.h"
 #include "sockerr.h"
 #include "opt.h"

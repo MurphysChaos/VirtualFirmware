@@ -75,16 +75,6 @@ typedef struct socket_panel {
     uint16_t sp_zero;
 } SOCKET_PANEL, PANEL;
 
-/*
- * A basic multicasting announcement structure. Lets distant hosts know
- * which port the TCP socket is listening on.
- */
-typedef struct sp_announce {
-    uint32_t sp_magic;
-    uint16_t sp_port;
-    uint16_t zero;
-} SP_ANNOUNCE;
-
 /* Functions for creating socket panels. */
 PANEL *CreateEmptyPanel(void);
 PANEL *CreatePanel(int af, int type, int proto);

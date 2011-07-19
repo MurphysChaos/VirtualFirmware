@@ -12,10 +12,6 @@
 #ifndef PANEL_H
 #define PANEL_H
 
-#ifdef _cplusplus
-extern "C" {
-#endif
-
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #pragma comment(lib, "Ws2_32.lib")
@@ -85,7 +81,7 @@ void DissociatePanel(PANEL *p);
 /* == UTILITY FUNCTIONS */
 struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af, int type, int proto);
 /* == MANIPULATOR FUNCTIONS */
-int BindPanel(PANEL *p, const char *addr, const char *svc);
+int BindPanel(PANEL *p, const char *addr, const char *svc, int reuse);
 int SetDestination(PANEL *p, const char *addr, const char *svc);
 /* -- Functions for multicasting */
 int MakeMulticast(PANEL *p);
@@ -100,9 +96,5 @@ void PrintAddrFamily(FILE *f, int af);
 void PrintAddrProtocol(FILE *f, int proto);
 void PrintAddrinfo(FILE *f, struct addrinfo *ai);
 void PrintAddr(FILE *f, struct sockaddr *sa);
-
-#ifdef _cplusplus
-}
-#endif
 
 #endif

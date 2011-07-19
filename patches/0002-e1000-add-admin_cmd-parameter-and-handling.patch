@@ -1,0 +1,96 @@
+From 640d2c42e2195e4a6f8fe3e4ca4c5c0a3db62816 Mon Sep 17 00:00:00 2001
+From: Shannon Nelson <shannon.nelson@intel.com>
+Date: Mon, 11 Jul 2011 12:04:34 -0700
+Subject: [PATCH 2/3] e1000: add admin_cmd parameter and handling
+
+Add a simple module parameter to request AdminQ command execution.  This adminq_cmd
+parameter is monitored by the watchdog_task - when non-zero, the value is passed to
+the AdminQ for processing then cleared.  The integer value selects a command to be
+sent through the AdminQ to the e1000 firmware, and the result is printed to the
+kernel message log.
+
+The first command implemented here is 1 which will send the firmware version request.
+
+Signed-off-by: Shannon Nelson <shannon.nelson@intel.com>
+---
+ src/e1000.h        |    1 +
+ src/e1000_adminq.c |   25 +++++++++++++++++++++++++
+ src/e1000_main.c   |   11 +++++++++++
+ 3 files changed, 37 insertions(+), 0 deletions(-)
+
+diff --git a/src/e1000.h b/src/e1000.h
+index 8e9b612..7129840 100644
+--- a/src/e1000.h
++++ b/src/e1000.h
+@@ -390,5 +390,6 @@ extern int ethtool_ioctl(struct ifreq *ifr);
+ 
+ extern int e1000_init_adminq(struct e1000_hw *hw);
+ extern int e1000_shutdown_adminq(struct e1000_hw *hw);
++extern void e1000_adminq_cmd(struct e1000_hw *hw, int cmd);
+ 
+ #endif /* _E1000_H_ */
+diff --git a/src/e1000_adminq.c b/src/e1000_adminq.c
+index 4d3e4f2..3608f1d 100644
+--- a/src/e1000_adminq.c
++++ b/src/e1000_adminq.c
+@@ -419,3 +419,28 @@ int e1000_aq_get_firmware_version(struct e1000_hw *hw, u16 *fw_major_version,
+ 	return E1000_SUCCESS;
+ }
+ 
++/**
++ * e1000_adminq_cmd - force a command through the adminq
++ *  @hw: pointer to the hw struct
++ * @cmd: the command to test
++ **/
++void e1000_adminq_cmd(struct e1000_hw *hw, int cmd)
++{
++	struct e1000_adapter *adapter = (struct e1000_adapter *)hw->back;
++	u16 fw_min, fw_maj, api_min, api_maj;
++
++	DPRINTK(PROBE, INFO, "command=%d\n", cmd);
++	switch (cmd) {
++	case 1: /* get_fw_ver */
++		e1000_aq_get_firmware_version(hw, &fw_min, &fw_maj,
++					      &api_min, &api_maj);
++		DPRINTK(PROBE, INFO, "fw= %02x %02x  api= %02x %02x\n",
++		        fw_maj, fw_min, api_maj, api_min);
++		break;
++	case 2: /* query */
++		break;
++	default:
++		break;
++	}
++}
++
+diff --git a/src/e1000_main.c b/src/e1000_main.c
+index 26bf071..dfde103 100644
+--- a/src/e1000_main.c
++++ b/src/e1000_main.c
+@@ -274,6 +274,11 @@ static int debug = NETIF_MSG_DRV | NETIF_MSG_PROBE;
+ module_param(debug, int, 0);
+ MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
+ 
++static int adminq_cmd = 0;
++module_param(adminq_cmd, int, S_IRUSR | S_IWUSR);
++MODULE_PARM_DESC(adminq_cmd, "Force adminq commands, 1=get_fw_ver, 2=query");
++
++
+ /**
+  * e1000_init_module - Driver Registration Routine
+  *
+@@ -2285,6 +2290,12 @@ static void e1000_watchdog_task(struct work_struct *work)
+ 	u32 link, tctl;
+ 	int tx_pending = 0;
+ 
++	/* send any pending command to adminq then clear it */
++	if (adminq_cmd) {
++		e1000_adminq_cmd(&adapter->hw, adminq_cmd);
++		adminq_cmd = 0;
++	}
++
+ 	link = e1000_has_link(adapter);
+ 	if ((netif_carrier_ok(netdev)) && link)
+ 		goto link_up;
+-- 
+1.7.4.4
+

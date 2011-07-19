@@ -8,6 +8,19 @@ struct announce_msg {
 
 #define PACKETS_PER_SEC 10
 
+#define DBG_STATUS 1
+#define DBG_ERROR  2
+#define DBG_ALL    3
+
+void dbg(int level, const char *msg, ...) {
+  if (OPT.dbglvl >= level) {
+    va_list args;
+    va_start(args, msg);
+    vfprintf(stderr, msg, args);
+    va_end(args);
+  }
+}
+
 SOCKET announce(const char *optrc) {
   PANEL* hs = NULL;
   PANEL* cs = NULL;
@@ -16,6 +29,8 @@ SOCKET announce(const char *optrc) {
   struct timeval tv;
   int num_packets = 0;
   int count = 0;
+
+  char addr[NI_MAXHOST];
 
   struct announce_msg m;
   
@@ -28,36 +43,43 @@ SOCKET announce(const char *optrc) {
 
   hs = CreateBoundPanel(OPT.mcastport, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(!hs) {
+    dbg(DBG_ERROR, "CreateBoundPanel(hs): %s\n", sock_error()); 
     goto err;
   }
 
   rc = SetDestination(hs, OPT.mcastip, OPT.mcastport);
   if(rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "SetDesination(hs): %s\n", sock_error());
     goto err;
   }
 
   rc = MakeMulticast(hs);
   if (rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
     goto err;
   }
 
   rc = SetMulticastTTL(hs, OPT.mcastttl);
   if (rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "SetMulticastTTL(hs): %s\n", sock_error());
     goto err;
   }
 
   rc = SetMulticastLoopback(hs, 1);
   if (rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "SetMulticastLoopback(hs): %s\n", sock_error());
     goto err;
   }
 
   cs = CreateBoundPanel(OPT.tcpport, AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if(!cs) {
+    dbg(DBG_ERROR, "CreateBoundPanel(cs): %s\n", sock_error());
     goto err;
   }
 
   rc = listen(cs->sp_socket, 1);
   if(rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "listen(cs): %s\n", sock_error());
     goto err;
   }
 
@@ -72,8 +94,11 @@ SOCKET announce(const char *optrc) {
 
     rc = sendto(hs->sp_socket, &m, sizeof(m), 0, &(hs->sp_dest), sizeof(hs->sp_dest));
     if (rc == SOCKET_ERROR) {
+      dbg(DBG_ERROR, "sendto(hs): %s\n", sock_error());
       goto err;
     }
+
+    dbg(DBG_ALL, "Sent announce msg %d to %s\n", count, FormatAddr(&(hs->sp_dest), addr, NI_MAXHOST));
 
     FD_ZERO(&readfds);
     FD_SET(cs->sp_socket, &readfds);
@@ -82,12 +107,14 @@ SOCKET announce(const char *optrc) {
     tv.tv_usec = 100000;
     rc = select(cs->sp_socket + 1, &readfds, NULL, NULL, &tv);
     if (rc < 0) {
+      dbg(DBG_ERROR, "select(cs): %s\n", sock_error());
       goto err;
     } else if (rc == 0) {
       continue;
     } else {
       acceptlen = sizeof(struct sockaddr);
       socket = accept(cs->sp_socket, &(cs->sp_dest), &acceptlen);
+      dbg(DBG_STATUS, "connected to %s\n", FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST));
       break;
     }
   }
@@ -118,6 +145,8 @@ SOCKET locate(const char *optrc) {
 
   struct announce_msg m;
   
+  char addr[NI_MAXHOST];
+
   socklen_t recvlen;
 
   SOCKET socket = INVALID_SOCKET;
@@ -127,31 +156,37 @@ SOCKET locate(const char *optrc) {
 
   hs = CreateBoundPanel(OPT.mcastport, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(!hs) {
+    dbg(DBG_ERROR, "CreateBoundPanel(hs): %s\n", sock_error());
     goto err;
   }
 
   rc = SetDestination(hs, OPT.mcastip, OPT.mcastport);
   if(rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "SetDestination(hs): %s\n", sock_error());
     goto err;
   }
 
   rc = MakeMulticast(hs);
   if (rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
     goto err;
   }
 
   rc = SetMulticastTTL(hs, OPT.mcastttl);
   if (rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "SetMulticastTTL(hs): %s\n", sock_error());
     goto err;
   }
 
   rc = SetMulticastLoopback(hs, 1);
   if (rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "SetMulticastLoopback(hs): %s\n", sock_error());
     goto err;
   }
 
   cs = CreateBoundPanel("0", AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if(!cs) {
+    dbg(DBG_ERROR, "CreateBoundPanel(cs): %s\n", sock_error());
     goto err;
   }
 
@@ -164,6 +199,7 @@ SOCKET locate(const char *optrc) {
 
     rc = select(hs->sp_socket + 1, &readfds, NULL, NULL, (OPT.timeout > 0 ? &tv : NULL));
     if (rc < 0) {
+      dbg(DBG_ERROR, "select(hs): %s\n", sock_error());
       goto err;
     } else if (rc == 0) {
       socket = INVALID_SOCKET;
@@ -175,18 +211,24 @@ SOCKET locate(const char *optrc) {
     recvlen = sizeof(struct sockaddr);
     rc = recvfrom(hs->sp_socket, &m, sizeof(m), 0, &(cs->sp_dest), &recvlen);
     if (rc == SOCKET_ERROR) {
+      dbg(DBG_ERROR, "recvfrom(hs): %s\n", sock_error());
       goto err;
     }
 
     m.magic = ntohl(m.magic);
 
+    dbg(DBG_ALL, "received announce (magic=%d) from %s\n",
+	m.magic, FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST)); 
+
     if (m.magic == OPT.magicnum) {
       ((struct sockaddr_in *) &(cs->sp_dest))->sin_port = m.port;
       rc = connect(cs->sp_socket, &(cs->sp_dest), sizeof(struct sockaddr));
       if (rc == SOCKET_ERROR) {
+	dbg(DBG_ERROR, "connect(cs): %s\n", sock_error());
 	goto err;
       }
       else {
+	dbg(DBG_STATUS, "connected to %s\n", FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST));
 	socket = cs->sp_socket;
       }
     }

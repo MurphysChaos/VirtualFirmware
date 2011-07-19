@@ -53,7 +53,7 @@ extern "C" {
 /* Flag Macros & Flags
  */
 #define sp_setflag(var,flag)	var = (var | flag)
-#define sp_getflag(var,flag)	var = (var & flag)
+#define sp_getflag(var,flag)	(var & flag)
 #define sp_clearflag(var,flag)	var = (var & ~(flag))
 #define SP_F_VALID		0x0001
 #define SP_F_LISTENER	0x0002

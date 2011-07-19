@@ -71,11 +71,11 @@ int main(int argc, char** argv) {
 
 	//Win32 socket initialization==========
 	WSADATA wsaData;
-    rc = WSAStartup(MAKEWORD(2,2), &wsaData);
-    if (rc != 0) {
-        printf("WSAStartup failed with error: %d\n", rc);
-        goto err;
-    }	
+	rc = WSAStartup(MAKEWORD(2,2), &wsaData);
+	if (rc != 0) {
+		printf("WSAStartup failed with error: %d\n", rc);
+		goto err;
+	}	
 	//=====================================
 
 	ProcessArgs(argc, argv);
@@ -83,66 +83,66 @@ int main(int argc, char** argv) {
 
 
 
-  if (bIsServer) {
-    //socket = announce(PORT, MAGIC);
-	socket = announce(NULL);
-    if (socket == INVALID_SOCKET) {
-      goto err;
-    }
-
-	rc = recvmsg_withlength(socket, &eBuf, &msg_len);
-    if (rc == SOCKET_ERROR) {
-      goto err;
-    }
-	else
-	{
-		//Now process the message
-		switch (eBuf.opcode) {
-		case e1000_aqc_get_version:
-			e1000_aq_get_version(&eBuf);
-			break;
-		case e1000_aqc_echo:
-			//e1000_aq_echo(&desc);
-			break;
-		default:
-			eBuf.retval = E1000_AQ_RC_ENOSYS;
-			break;
+	if (bIsServer) {
+		//socket = announce(PORT, MAGIC);
+		socket = announce(NULL);
+		if (socket == INVALID_SOCKET) {
+			goto err;
 		}
 
-		// writeback descriptor
-		eBuf.flags |= E1000_AQ_FLAG_DD;		
-
-		//try to send it back
-		if(sendmsg_withlength(socket, &eBuf, msg_len) == SOCKET_ERROR)
+		rc = recvmsg_withlength(socket, &eBuf, &msg_len);
+		if (rc == SOCKET_ERROR) {
 			goto err;
-	}
+		}
+		else
+		{
+			//Now process the message
+			switch (eBuf.opcode) {
+			case e1000_aqc_get_version:
+				e1000_aq_get_version(&eBuf);
+				break;
+			case e1000_aqc_echo:
+				//e1000_aq_echo(&desc);
+				break;
+			default:
+				eBuf.retval = E1000_AQ_RC_ENOSYS;
+				break;
+			}
+
+			// writeback descriptor
+			eBuf.flags |= E1000_AQ_FLAG_DD;		
+
+			//try to send it back
+			if(sendmsg_withlength(socket, &eBuf, msg_len) == SOCKET_ERROR)
+				goto err;
+		}
 
     
-  } else {
-	//initialize the message
-	eMsg.flags = 1;
-    eMsg.opcode = 2;
-    eMsg.datalen = 3;
-    eMsg.retval = 4;
-    eMsg.cookie_high = 5;
-    eMsg.cookie_low = 6;
-    eMsg.param0 = 7;
-    eMsg.param1 = 8;
-    eMsg.addr_high = 9;
-    eMsg.addr_low = 10;
+	} else {
+		//initialize the message
+		eMsg.flags = 1;
+		eMsg.opcode = 2;
+		eMsg.datalen = 3;
+		eMsg.retval = 4;
+		eMsg.cookie_high = 5;
+		eMsg.cookie_low = 6;
+		eMsg.param0 = 7;
+		eMsg.param1 = 8;
+		eMsg.addr_high = 9;
+		eMsg.addr_low = 10;
 
-	socket = locate(NULL);
-    if (socket == INVALID_SOCKET) {
-      goto err;
-    }
+		socket = locate(NULL);
+		if (socket == INVALID_SOCKET) {
+			goto err;
+		}
     
 	
-	rc = sendmsg_withlength(socket, &eMsg, sizeof(struct e1000_aq_desc));
-	printf("Sent %d bytes\n", sizeof(struct e1000_aq_desc));
-    if (rc == SOCKET_ERROR) {
-      goto err;
-    }
-  }
+		rc = sendmsg_withlength(socket, &eMsg, sizeof(struct e1000_aq_desc));
+		printf("Sent %d bytes\n", sizeof(struct e1000_aq_desc));
+		if (rc == SOCKET_ERROR) {
+			goto err;
+		}
+	}
 
 
 
@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
 	WSACleanup();
 	return 0;
 
-	err:
+err:
 	closesocket(socket);
 	WSACleanup();
 	return -1;

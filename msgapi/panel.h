@@ -23,7 +23,6 @@ extern "C" {
 #include <WS2tcpip.h>
 #include <WinError.h>
 #include "stdint.h"
-#define EAFNOSUPPORT    97      /* Address family not supported by protocol */ /* Win32 doesn't have this, I don't know why */
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -53,9 +52,9 @@ extern "C" {
 
 /* Flag Macros & Flags
  */
-#define sp_setflag(var,flag)	(var | flag)
-#define sp_getflag(var,flag)	(var & flag)
-#define sp_clearflag(var,flag)	(var & ~(flag))
+#define sp_setflag(var,flag)	var = (var | flag)
+#define sp_getflag(var,flag)	var = (var & flag)
+#define sp_clearflag(var,flag)	var = (var & ~(flag))
 #define SP_F_VALID		0x0001
 #define SP_F_LISTENER	0x0002
 #define SP_F_SENDER		0x0004

@@ -45,7 +45,7 @@ int buildIfPanel(IF_PANEL *p, const char *addr, struct sockaddr *sa) {
     return rc;
   }
 
-  rc = MakeMulticast(p->hs);
+  rc = MakeMulticast(p->hs, NULL);
   if (rc == SOCKET_ERROR) {
     return rc;
   }
@@ -298,7 +298,7 @@ SOCKET locate(const char *optrc) {
     goto err;
   }
 
-  rc = MakeMulticast(hs);
+  rc = MakeMulticast(hs, "0.0.0.0");
   if (rc == SOCKET_ERROR) {
     dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
     goto err;

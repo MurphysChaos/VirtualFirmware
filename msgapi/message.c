@@ -114,21 +114,22 @@ int populateInterfaceData(IF_PANEL *if_p, int *numIfs) {
       if ((numFoundIfs + 1) > *numIfs) {
 	numFoundIfs++;
 	continue;
-
-	rc = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), addrString, NI_MAXHOST, 0, 0, 0);
-	if (rc != 0) {
-	  rc = SOCKET_ERROR;
-	  goto err;
-	}
-
-	rc = buildIfPanel(&if_p[numFoundIfs], addrString, ifa->ifa_addr);
-	if (rc == SOCKET_ERROR) {
-	  goto err;
-	}
-	
-	// Increment the total number of interfaces
-	numFoundIfs++;
       }
+      rc = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), addrString, NI_MAXHOST, 0, 0, NI_NUMERICHOST);
+      if (rc != 0) {
+	rc = SOCKET_ERROR;
+	goto err;
+      }
+      
+      dbg(DBG_ALL, "Using interface '%s' (%s)\n", addrString, ifa->ifa_name);
+
+      rc = buildIfPanel(&if_p[numFoundIfs], addrString, ifa->ifa_addr);
+      if (rc == SOCKET_ERROR) {
+	goto err;
+      }
+      
+      // Increment the total number of interfaces
+      numFoundIfs++;
     }
   }
   
@@ -147,9 +148,10 @@ int populateInterfaceData(IF_PANEL *if_p, int *numIfs) {
 #endif
 }
 
+#define MAX_IF_LENGTH 32
 SOCKET announce(const char *optrc) {
-  IF_PANEL ifp[32];
-  int ifp_length = 32;
+  IF_PANEL ifp[MAX_IF_LENGTH];
+  int ifp_length = MAX_IF_LENGTH;
 
   fd_set readfds;
   struct timeval tv;
@@ -172,7 +174,7 @@ SOCKET announce(const char *optrc) {
 
   memset(ifp, 0, sizeof(IF_PANEL) * 32);
 
-  rc = populateInterfaceData(ifp, &ifp_len);
+  rc = populateInterfaceData(ifp, &ifp_length);
   if (rc == SOCKET_ERROR) {
     dbg(DBG_ERROR, "populateInterfaceData(): '%s'\n", sock_error());
     goto err;
@@ -204,7 +206,7 @@ SOCKET announce(const char *optrc) {
       }
     }
 
-    dbg(DBG_ALL, "Sent announce msg %d to %s\n", count, FormatAddr(&(hs->sp_dest), addr, NI_MAXHOST));
+    dbg(DBG_ALL, "Sent announce msg %d to %s\n", count, FormatAddr(&(ifp[0].hs->sp_dest), addr, NI_MAXHOST));
 
     FD_ZERO(&readfds);
     
@@ -240,18 +242,21 @@ SOCKET announce(const char *optrc) {
     }
   }
 
-  FreePanel(hs);
-  DissociatePanel(cs);
- 
+  for (i = 0; i < ifp_length; i++) {
+    FreePanel(ifp[i].hs);
+    if (socket == ifp[i].cs->sp_socket) {
+      DissociatePanel(ifp[i].cs);
+    } else {
+      FreePanel(ifp[i].cs);
+    }
+  } 
+
   return socket;
 
  err:
-  if (hs) {
-    FreePanel(hs);
-  }
-
-  if (cs) {
-    FreePanel(cs);
+  for (i = 0; i < ifp_length || i < MAX_IF_LENGTH; i++) {
+    FreePanel(ifp[i].hs);
+    FreePanel(ifp[i].cs);
   }
 
   return INVALID_SOCKET;
@@ -275,9 +280,15 @@ SOCKET locate(const char *optrc) {
 
   ReadOptions(optrc);
 
-  hs = CreateBoundPanel(OPT.mcastport, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  hs = CreatePanel(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(!hs) {
     dbg(DBG_ERROR, "CreateBoundPanel(hs): %s\n", sock_error());
+    goto err;
+  }
+
+  rc = BindPanel(hs, OPT.mcastip, OPT.mcastport, 1);
+  if(rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "BindPanel(hs), '%s'\n", sock_error());
     goto err;
   }
 

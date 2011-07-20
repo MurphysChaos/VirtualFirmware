@@ -180,7 +180,7 @@ int SetDestination(PANEL *p, const char *addr, const char *svc) {
  * and setting the send interface. Uses p->sp_dest which must be set prior to 
  * calling.
  */
-int MakeMulticast(PANEL *p) {
+int MakeMulticast(PANEL *p, const char *ifaddr) {
 	int level, option, optlen;
 	char *optval;
 	int rc;
@@ -188,6 +188,7 @@ int MakeMulticast(PANEL *p) {
 	if ((p->sp_dest.sa_family == AF_INET) || (p->sp_dest.sa_family == AF_UNSPEC)) {
 		struct ip_mreq mreq;
 		struct sockaddr_in *sin = (struct sockaddr_in *) &(p->sp_dest);
+		struct sockaddr_in *sbind = (struct sockaddr_in *) &(p->sp_bind);
 
 		// IPv4 multicast membership parameters
 		level = IPPROTO_IP;
@@ -195,7 +196,11 @@ int MakeMulticast(PANEL *p) {
 		optval = (char *) &mreq;
 		optlen = sizeof (mreq);
 		mreq.imr_multiaddr.s_addr = sin->sin_addr.s_addr;
-		mreq.imr_interface.s_addr = INADDR_ANY;
+		if (ifaddr) {
+			inet_pton(AF_INET,  ifaddr, &mreq.imr_interface.s_addr);
+		} else {
+			mreq.imr_interface.s_addr = sbind->sin_addr.s_addr;
+		}
 	} else if (p->sp_dest.sa_family == AF_INET6) {
 		struct ipv6_mreq mreq6;
 		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) &(p->sp_dest);

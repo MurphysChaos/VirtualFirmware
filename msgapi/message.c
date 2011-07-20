@@ -148,65 +148,43 @@ int populateInterfaceData(IF_PANEL *if_p, int *numIfs) {
 }
 
 SOCKET announce(const char *optrc) {
-  PANEL* hs = NULL;
-  PANEL* cs = NULL;
+  IF_PANEL ifp[32];
+  int ifp_length = 32;
 
   fd_set readfds;
   struct timeval tv;
   int num_packets = 0;
   int count = 0;
 
+  int maxSocket = 0;
+
   char addr[NI_MAXHOST];
 
   struct announce_msg m;
   
   socklen_t acceptlen;
+  int i;
 
   SOCKET socket = INVALID_SOCKET;
   int rc = 0;
 
   ReadOptions(optrc);
 
-  hs = CreateBoundPanel(OPT.mcastport, AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if(!hs) {
-    dbg(DBG_ERROR, "CreateBoundPanel(hs): %s\n", sock_error()); 
-    goto err;
-  }
+  memset(ifp, 0, sizeof(IF_PANEL) * 32);
 
-  rc = SetDestination(hs, OPT.mcastip, OPT.mcastport);
-  if(rc == SOCKET_ERROR) {
-    dbg(DBG_ERROR, "SetDesination(hs): %s\n", sock_error());
-    goto err;
-  }
-
-  rc = MakeMulticast(hs);
+  rc = populateInterfaceData(ifp, &ifp_len);
   if (rc == SOCKET_ERROR) {
-    dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
+    dbg(DBG_ERROR, "populateInterfaceData(): '%s'\n", sock_error());
     goto err;
   }
 
-  rc = SetMulticastTTL(hs, OPT.mcastttl);
-  if (rc == SOCKET_ERROR) {
-    dbg(DBG_ERROR, "SetMulticastTTL(hs): %s\n", sock_error());
-    goto err;
-  }
-
-  rc = SetMulticastLoopback(hs, 1);
-  if (rc == SOCKET_ERROR) {
-    dbg(DBG_ERROR, "SetMulticastLoopback(hs): %s\n", sock_error());
-    goto err;
-  }
-
-  cs = CreateBoundPanel(OPT.tcpport, AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if(!cs) {
-    dbg(DBG_ERROR, "CreateBoundPanel(cs): %s\n", sock_error());
-    goto err;
-  }
-
-  rc = listen(cs->sp_socket, 1);
-  if(rc == SOCKET_ERROR) {
-    dbg(DBG_ERROR, "listen(cs): %s\n", sock_error());
-    goto err;
+  /* Listen on each interface */
+  for (i = 0; i < ifp_length; i++) {
+    rc = listen(ifp[i].cs->sp_socket, 1);
+    if (rc == SOCKET_ERROR) {
+      dbg(DBG_ERROR, "listen(cs): '%s'\n", sock_error());
+      goto err;
+    }
   }
 
   num_packets = OPT.timeout * PACKETS_PER_SEC;
@@ -218,30 +196,47 @@ SOCKET announce(const char *optrc) {
     m.port = htons(atoi(OPT.tcpport));
     m.flags = 0;
 
-    rc = sendto(hs->sp_socket, &m, sizeof(m), 0, &(hs->sp_dest), sizeof(hs->sp_dest));
-    if (rc == SOCKET_ERROR) {
-      dbg(DBG_ERROR, "sendto(hs): %s\n", sock_error());
-      goto err;
+    for (i = 0; i < ifp_length; i++) {
+      rc = sendto(ifp[i].hs->sp_socket, &m, sizeof(m), 0, &(ifp[i].hs->sp_dest), sizeof(ifp[i].hs->sp_dest));
+      if (rc == SOCKET_ERROR) {
+	dbg(DBG_ERROR, "sendto(hs): %s\n", sock_error());
+	goto err;
+      }
     }
 
     dbg(DBG_ALL, "Sent announce msg %d to %s\n", count, FormatAddr(&(hs->sp_dest), addr, NI_MAXHOST));
 
     FD_ZERO(&readfds);
-    FD_SET(cs->sp_socket, &readfds);
+    
+    for (i = 0; i < ifp_length; i++) {
+      if (ifp[i].cs->sp_socket > maxSocket) {
+	maxSocket = ifp[i].cs->sp_socket;
+      }
+      FD_SET(ifp[i].cs->sp_socket, &readfds);
+    }
     
     tv.tv_sec = 0;
     tv.tv_usec = 100000;
-    rc = select(cs->sp_socket + 1, &readfds, NULL, NULL, &tv);
+    rc = select(maxSocket + 1, &readfds, NULL, NULL, &tv);
     if (rc < 0) {
       dbg(DBG_ERROR, "select(cs): %s\n", sock_error());
       goto err;
     } else if (rc == 0) {
       continue;
     } else {
-      acceptlen = sizeof(struct sockaddr);
-      socket = accept(cs->sp_socket, &(cs->sp_dest), &acceptlen);
-      dbg(DBG_STATUS, "connected to %s\n", FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST));
-      break;
+      for (i = 0; i < ifp_length; i++) {
+	if (FD_ISSET(ifp[i].cs->sp_socket, &readfds)) {
+	  acceptlen = sizeof(struct sockaddr);
+	  socket = accept(ifp[i].cs->sp_socket, &(ifp[i].cs->sp_dest), &acceptlen);
+	  dbg(DBG_STATUS, "connected to %s\n", FormatAddr(&(ifp[i].cs->sp_dest), addr, NI_MAXHOST));
+	  break;
+	}
+      }
+      
+      /* we have a connection */
+      if (socket != INVALID_SOCKET) {
+	break;
+      }
     }
   }
 

@@ -84,7 +84,7 @@ struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af, int type
 int BindPanel(PANEL *p, const char *addr, const char *svc, int reuse);
 int SetDestination(PANEL *p, const char *addr, const char *svc);
 /* -- Functions for multicasting */
-int MakeMulticast(PANEL *p, const char *ifaddr);
+int JoinMulticastGroup(PANEL *p, const char *ifaddr);
 int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr);
 int SetMulticastTTL(PANEL *p, int ttl);
 int SetMulticastLoopback(PANEL *p, int loopval);

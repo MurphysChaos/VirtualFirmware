@@ -180,7 +180,7 @@ int SetDestination(PANEL *p, const char *addr, const char *svc) {
  * and setting the send interface. Uses p->sp_dest which must be set prior to 
  * calling.
  */
-int MakeMulticast(PANEL *p, const char *ifaddr) {
+int JoinMulticastGroup(PANEL *p, const char *ifaddr) {
 	int level, option, optlen;
 	char *optval;
 	int rc;

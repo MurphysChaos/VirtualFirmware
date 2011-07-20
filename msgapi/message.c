@@ -52,7 +52,7 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
     return rc;
   }
 
-  rc = MakeMulticast(p->hs, NULL);
+  rc = JoinMulticastGroup(p->hs, NULL);
   if (rc == SOCKET_ERROR) {
     return rc;
   }
@@ -326,7 +326,7 @@ SOCKET locate(const char *optrc) {
   }
 
   for (i = 0; i < ifd_length; i++) {
-    rc = MakeMulticast(hs, ifd[i].if_addr);
+    rc = JoinMulticastGroup(hs, ifd[i].if_addr);
     if (rc == SOCKET_ERROR) {
       dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
       goto err;

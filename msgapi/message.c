@@ -383,7 +383,7 @@ SOCKET locate(const char *optrc) {
   return INVALID_SOCKET;
 }
 
-int sendmsg_withlength(SOCKET socket, void* data, uint16_t length)
+int senddata(SOCKET socket, void* data, uint16_t length)
 {
 	int rc = 0;
 	uint16_t net_length = htons(length);
@@ -412,7 +412,7 @@ int sendmsg_withlength(SOCKET socket, void* data, uint16_t length)
 	return rc;
 }
 
-int recvmsg_withlength(SOCKET socket, void* data, uint16_t* length)
+int recvdata(SOCKET socket, void* data, uint16_t* length)
 {
 	int rc = 0;
 	int recv_length = sizeof(uint16_t);

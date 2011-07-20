@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
             goto err;
         }
 
-        rc = recvmsg_withlength(socket, buffer, &msg_size);
+        rc = recvdata(socket, buffer, &msg_size);
         if (rc == SOCKET_ERROR) {
             goto err;
         }
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
             goto err;
         }
 
-        rc = sendmsg_withlength(socket, msg, strlen(msg));
+        rc = senddata(socket, msg, strlen(msg));
         if (rc == SOCKET_ERROR) {
             goto err;
         }

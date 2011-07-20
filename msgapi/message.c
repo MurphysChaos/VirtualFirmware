@@ -88,9 +88,8 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
 int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
 #ifdef _WIN32
   SOCKET s;
-  int numFoundIfs, i, rc = 0, pc = 0;
+  int i, rc = 0, pc = 0, numFoundIfs = 0;
   INTERFACE_INFO interfaces[32];
-  unsigned long nReturned = 0;
   
   s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (s == INVALID_SOCKET) {
@@ -105,7 +104,7 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
 		0,
 		&interfaces,
 		sizeof(INTERFACE_INFO) * 32,
-		&nReturned,
+		(LPDWORD) &numFoundIfs,
 		0,
 		0);
 
@@ -114,8 +113,8 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
     goto err;
   }
 
-  nReturned /= sizeof(INTERFACE_INFO);
-  for (i = 0; i < nReturned; i++) {
+  numFoundIfs /= sizeof(INTERFACE_INFO);
+  for (i = 0; i < numFoundIfs; i++) {
     INTERFACE_INFO *pIf = &interfaces[i];
     if ((pIf->iiFlags & IFF_UP) &&
 	(pIf->iiFlags & IFF_MULTICAST) &&
@@ -128,7 +127,7 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
       }
 
       /* We found a useful interface */
-      rc = getnameinfo(pIf->iiAddress.Address,
+      rc = getnameinfo(&(pIf->iiAddress.Address),
 		       sizeof(struct sockaddr_in),
 		       if_d[numFoundIfs].if_addr,
 		       NI_MAXHOST,
@@ -141,8 +140,7 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
       }
       
       /* Name the adapter */
-      snprintf(if_d[numFoundIfs].if_name,
-	       NI_MAXHOST,
+      sprintf(if_d[numFoundIfs].if_name,
 	       "ifwin%d",
 	       i);
 

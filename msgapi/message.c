@@ -53,9 +53,9 @@ SOCKET announce(const char *optrc) {
     goto err;
   }
 
-  rc = MakeMulticast(hs);
+  rc = JoinMulticastGroup(hs);
   if (rc == SOCKET_ERROR) {
-    dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
+    dbg(DBG_ERROR, "JoinMulticastGroup(hs): %s\n", sock_error());
     goto err;
   }
 
@@ -166,9 +166,9 @@ SOCKET locate(const char *optrc) {
     goto err;
   }
 
-  rc = MakeMulticast(hs);
+  rc = JoinMulticastGroup(hs);
   if (rc == SOCKET_ERROR) {
-    dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
+    dbg(DBG_ERROR, "JoinMulticastGroup(hs): %s\n", sock_error());
     goto err;
   }
 

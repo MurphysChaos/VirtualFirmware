@@ -24,18 +24,25 @@ void dbg(int level, const char *msg, ...) {
 typedef struct if_panel {
   PANEL *hs;
   PANEL *cs;
-  char if_addr[NI_MAXHOST];
 } IF_PANEL;
 
-int buildIfPanel(IF_PANEL *p, const char *addr, struct sockaddr *sa) {
+typedef struct if_data {
+  char if_addr[NI_MAXHOST];
+  char if_name[NI_MAXHOST];
+  struct sockaddr sa;
+} IF_DATA;
+
+int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
   int rc = 0;
+
+  dbg(DBG_ALL, "Using interface '%s' (%s)\n", i->if_addr, i->if_name);
 
   p->hs = CreatePanel(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (p->hs == NULL) {
     return SOCKET_ERROR;
   }
 
-  rc = BindPanel(p->hs, addr, OPT.mcastport, 1);
+  rc = BindPanel(p->hs, i->if_addr, OPT.mcastport, 1);
   if (rc == SOCKET_ERROR) {
     return rc;
   }
@@ -50,7 +57,7 @@ int buildIfPanel(IF_PANEL *p, const char *addr, struct sockaddr *sa) {
     return rc;
   }
 
-  rc = SetMulticastSendInterface(p->hs, sa);
+  rc = SetMulticastSendInterface(p->hs, &i->sa);
   if (rc == SOCKET_ERROR) {
     return rc;
   }
@@ -70,17 +77,15 @@ int buildIfPanel(IF_PANEL *p, const char *addr, struct sockaddr *sa) {
     return SOCKET_ERROR;
   }
 
-  rc = BindPanel(p->cs, addr, OPT.tcpport, 1);
+  rc = BindPanel(p->cs, i->if_addr, OPT.tcpport, 1);
   if (rc == SOCKET_ERROR) {
     return rc;
   }
 
-  strncpy(p->if_addr, addr, NI_MAXHOST);
-
   return 0;
 }
 
-int populateInterfaceData(IF_PANEL *if_p, int *numIfs) {
+int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
 #ifdef _WIN32
   set_error(ENOTSUP);
   return SOCKET_ERROR;
@@ -115,20 +120,19 @@ int populateInterfaceData(IF_PANEL *if_p, int *numIfs) {
 	numFoundIfs++;
 	continue;
       }
+
       rc = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), addrString, NI_MAXHOST, 0, 0, NI_NUMERICHOST);
       if (rc != 0) {
 	rc = SOCKET_ERROR;
-	goto err;
+	return rc;
       }
-      
-      dbg(DBG_ALL, "Using interface '%s' (%s)\n", addrString, ifa->ifa_name);
 
-      rc = buildIfPanel(&if_p[numFoundIfs], addrString, ifa->ifa_addr);
-      if (rc == SOCKET_ERROR) {
-	goto err;
-      }
-      
-      // Increment the total number of interfaces
+      /* Copy relevant data into the IF_DATA buffer */
+      strncpy(if_d[numFoundIfs].if_addr, addrString, NI_MAXHOST);
+      strncpy(if_d[numFoundIfs].if_name, ifa->ifa_name, NI_MAXHOST);
+      memcpy(&if_d[numFoundIfs].sa, ifa->ifa_addr, sizeof(struct sockaddr));
+
+      /* Increment the total number of interfaces */
       numFoundIfs++;
     }
   }
@@ -141,9 +145,11 @@ int populateInterfaceData(IF_PANEL *if_p, int *numIfs) {
   }
 
   *numIfs = numFoundIfs;
+  freeifaddrs(ifaddrs);
   return rc;
   
  err:
+  freeifaddrs(ifaddrs);
   return rc;
 #endif
 }
@@ -151,7 +157,8 @@ int populateInterfaceData(IF_PANEL *if_p, int *numIfs) {
 #define MAX_IF_LENGTH 32
 SOCKET announce(const char *optrc) {
   IF_PANEL ifp[MAX_IF_LENGTH];
-  int ifp_length = MAX_IF_LENGTH;
+  IF_DATA ifd[MAX_IF_LENGTH];
+  int ifd_length = MAX_IF_LENGTH;
 
   fd_set readfds;
   struct timeval tv;
@@ -174,14 +181,24 @@ SOCKET announce(const char *optrc) {
 
   memset(ifp, 0, sizeof(IF_PANEL) * 32);
 
-  rc = populateInterfaceData(ifp, &ifp_length);
+  rc = populateInterfaceData(ifd, &ifd_length);
   if (rc == SOCKET_ERROR) {
     dbg(DBG_ERROR, "populateInterfaceData(): '%s'\n", sock_error());
     goto err;
   }
 
+  /* We have the interface data in useable form
+   * Now we can build the interface panels */
+  for (i = 0; i < ifd_length; i++) {
+    rc = buildIfPanel(&ifp[i], &ifd[i]);
+    if (rc == SOCKET_ERROR) {
+      dbg(DBG_ERROR, "buildIfPanel(%d): '%s'\n", i, sock_error());
+      goto err;
+    }
+  }
+
   /* Listen on each interface */
-  for (i = 0; i < ifp_length; i++) {
+  for (i = 0; i < ifd_length; i++) {
     rc = listen(ifp[i].cs->sp_socket, 1);
     if (rc == SOCKET_ERROR) {
       dbg(DBG_ERROR, "listen(cs): '%s'\n", sock_error());
@@ -198,7 +215,7 @@ SOCKET announce(const char *optrc) {
     m.port = htons(atoi(OPT.tcpport));
     m.flags = 0;
 
-    for (i = 0; i < ifp_length; i++) {
+    for (i = 0; i < ifd_length; i++) {
       rc = sendto(ifp[i].hs->sp_socket, &m, sizeof(m), 0, &(ifp[i].hs->sp_dest), sizeof(ifp[i].hs->sp_dest));
       if (rc == SOCKET_ERROR) {
 	dbg(DBG_ERROR, "sendto(hs): %s\n", sock_error());
@@ -210,7 +227,7 @@ SOCKET announce(const char *optrc) {
 
     FD_ZERO(&readfds);
     
-    for (i = 0; i < ifp_length; i++) {
+    for (i = 0; i < ifd_length; i++) {
       if (ifp[i].cs->sp_socket > maxSocket) {
 	maxSocket = ifp[i].cs->sp_socket;
       }
@@ -226,7 +243,7 @@ SOCKET announce(const char *optrc) {
     } else if (rc == 0) {
       continue;
     } else {
-      for (i = 0; i < ifp_length; i++) {
+      for (i = 0; i < ifd_length; i++) {
 	if (FD_ISSET(ifp[i].cs->sp_socket, &readfds)) {
 	  acceptlen = sizeof(struct sockaddr);
 	  socket = accept(ifp[i].cs->sp_socket, &(ifp[i].cs->sp_dest), &acceptlen);
@@ -242,7 +259,7 @@ SOCKET announce(const char *optrc) {
     }
   }
 
-  for (i = 0; i < ifp_length; i++) {
+  for (i = 0; i < ifd_length; i++) {
     FreePanel(ifp[i].hs);
     if (socket == ifp[i].cs->sp_socket) {
       DissociatePanel(ifp[i].cs);
@@ -254,7 +271,7 @@ SOCKET announce(const char *optrc) {
   return socket;
 
  err:
-  for (i = 0; i < ifp_length || i < MAX_IF_LENGTH; i++) {
+  for (i = 0; i < ifd_length || i < MAX_IF_LENGTH; i++) {
     FreePanel(ifp[i].hs);
     FreePanel(ifp[i].cs);
   }
@@ -265,6 +282,10 @@ SOCKET announce(const char *optrc) {
 SOCKET locate(const char *optrc) {
   PANEL* hs = NULL;
   PANEL* cs = NULL;
+
+  IF_DATA ifd[MAX_IF_LENGTH];
+  int ifd_length = MAX_IF_LENGTH;
+  int i = 0;
 
   fd_set readfds;
   struct timeval tv;
@@ -279,6 +300,12 @@ SOCKET locate(const char *optrc) {
   int rc = 0;
 
   ReadOptions(optrc);
+
+  rc = populateInterfaceData(ifd, &ifd_length);
+  if (rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "populateInterfaceData(): '%s'\n", sock_error());
+    goto err;
+  }
 
   hs = CreatePanel(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if(!hs) {
@@ -298,12 +325,13 @@ SOCKET locate(const char *optrc) {
     goto err;
   }
 
-  rc = MakeMulticast(hs, "0.0.0.0");
-  if (rc == SOCKET_ERROR) {
-    dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
-    goto err;
+  for (i = 0; i < ifd_length; i++) {
+    rc = MakeMulticast(hs, ifd[i].if_addr);
+    if (rc == SOCKET_ERROR) {
+      dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
+      goto err;
+    }
   }
-
   rc = SetMulticastTTL(hs, OPT.mcastttl);
   if (rc == SOCKET_ERROR) {
     dbg(DBG_ERROR, "SetMulticastTTL(hs): %s\n", sock_error());

@@ -87,13 +87,88 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
 
 int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
 #ifdef _WIN32
-  set_error(ENOTSUP);
-  return SOCKET_ERROR;
+  SOCKET s;
+  int numFoundIfs, i, rc = 0, pc = 0;
+  INTERFACE_INFO interfaces[32];
+  unsigned long nReturned = 0;
+  
+  s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (s == INVALID_SOCKET) {
+    dbg(DBG_ERROR, "socket(): '%s'\n", sock_error());
+    rc = SOCKET_ERROR;
+    goto err;
+  }
+
+  rc = WSAIoctl(s,
+		SIO_GET_INTERFACE_LIST,
+		0,
+		0,
+		&interfaces,
+		sizeof(INTERFACE_INFO) * 32,
+		&nReturned,
+		0,
+		0);
+
+  if (rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "SIO_GET_INTERFACE_LIST: '%s'\n", sock_error());
+    goto err;
+  }
+
+  nReturned /= sizeof(INTERFACE_INFO);
+  for (i = 0; i < nReturned; i++) {
+    INTERFACE_INFO *pIf = &interfaces[i];
+    if ((pIf->iiFlags & IFF_UP) &&
+	(pIf->iiFlags & IFF_MULTICAST) &&
+	!(pIf->iiFlags & IFF_LOOPBACK)) {
+
+      /* We check to make sure we can hold the interface */
+      if ((numFoundIfs + 1) > *numIfs) {
+	numFoundIfs++;
+	continue;
+      }
+
+      /* We found a useful interface */
+      rc = getnameinfo(pIf->iiAddress.Address,
+		       sizeof(struct sockaddr_in),
+		       if_d[numFoundIfs].if_addr,
+		       NI_MAXHOST,
+		       0,
+		       0,
+		       NI_NUMERICHOST);
+      if (rc != 0) {
+	rc = SOCKET_ERROR;
+	return rc;
+      }
+      
+      /* Name the adapter */
+      snprintf(if_d[numFoundIfs].if_name,
+	       NI_MAXHOST,
+	       "ifwin%d",
+	       i);
+
+      /* Copy the struct sockaddr */
+      memcpy(&if_d[numFoundIfs].sa, &pIf->iiAddress.Address, sizeof(struct sockaddr));
+
+      /* Increment the total number of adapters */
+      numFoundIfs++;
+    }
+  }
+
+  /* return an error if we didn't have enough storage */
+  if (numFoundIfs > *numIfs) {
+    set_error(ENOMEM);
+    dbg(DBG_ERROR, "populateInterfaceData(): not enough memory\n");
+    rc = SOCKET_ERROR;
+  }
+
+  *numIfs = numFoundIfs;
+  return rc;
+  
+ err:
+  return rc;
 #else
   struct ifaddrs *ifaddrs = NULL;
   struct ifaddrs *ifa = NULL;
-
-  char addrString[NI_MAXHOST];
 
   int numFoundIfs = 0;
   int rc = 0;
@@ -121,14 +196,19 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
 	continue;
       }
 
-      rc = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), addrString, NI_MAXHOST, 0, 0, NI_NUMERICHOST);
+      rc = getnameinfo(ifa->ifa_addr,
+		       sizeof(struct sockaddr_in),
+		       if_d[numFoundIfs].if_addr,
+		       NI_MAXHOST,
+		       0,
+		       0,
+		       NI_NUMERICHOST);
       if (rc != 0) {
 	rc = SOCKET_ERROR;
 	return rc;
       }
 
       /* Copy relevant data into the IF_DATA buffer */
-      strncpy(if_d[numFoundIfs].if_addr, addrString, NI_MAXHOST);
       strncpy(if_d[numFoundIfs].if_name, ifa->ifa_name, NI_MAXHOST);
       memcpy(&if_d[numFoundIfs].sa, ifa->ifa_addr, sizeof(struct sockaddr));
 

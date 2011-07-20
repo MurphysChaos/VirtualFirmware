@@ -11,11 +11,20 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="message.h" />
+    <ClInclude Include="opt.h" />
+    <ClInclude Include="panel.h" />
     <ClInclude Include="tx_api.h" />
     <ClInclude Include="tx_port.h" />
+    <ClInclude Include="wsa_strerror.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="message.c" />
+    <ClCompile Include="opt.c" />
+    <ClCompile Include="panel.c" />
+    <ClCompile Include="sockerr.c" />
     <ClCompile Include="vf_tx.c" />
+    <ClCompile Include="wsa_strerror.c" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\tx.lib" />

@@ -12,10 +12,6 @@
 #ifndef PANEL_H
 #define PANEL_H
 
-#ifdef _cplusplus
-extern "C" {
-#endif
-
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #pragma comment(lib, "Ws2_32.lib")
@@ -23,7 +19,6 @@ extern "C" {
 #include <WS2tcpip.h>
 #include <WinError.h>
 #include "stdint.h"
-#define EAFNOSUPPORT    97      /* Address family not supported by protocol */ /* Win32 doesn't have this, I don't know why */
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -53,9 +48,9 @@ extern "C" {
 
 /* Flag Macros & Flags
  */
-#define sp_setflag(var,flag)	(var | flag)
+#define sp_setflag(var,flag)	var = (var | flag)
 #define sp_getflag(var,flag)	(var & flag)
-#define sp_clearflag(var,flag)	(var & ~(flag))
+#define sp_clearflag(var,flag)	var = (var & ~(flag))
 #define SP_F_VALID		0x0001
 #define SP_F_LISTENER	0x0002
 #define SP_F_SENDER		0x0004
@@ -76,16 +71,6 @@ typedef struct socket_panel {
     uint16_t sp_zero;
 } SOCKET_PANEL, PANEL;
 
-/*
- * A basic multicasting announcement structure. Lets distant hosts know
- * which port the TCP socket is listening on.
- */
-typedef struct sp_announce {
-    uint32_t sp_magic;
-    uint16_t sp_port;
-    uint16_t zero;
-} SP_ANNOUNCE;
-
 /* Functions for creating socket panels. */
 PANEL *CreateEmptyPanel(void);
 PANEL *CreatePanel(int af, int type, int proto);
@@ -96,10 +81,10 @@ void DissociatePanel(PANEL *p);
 /* == UTILITY FUNCTIONS */
 struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af, int type, int proto);
 /* == MANIPULATOR FUNCTIONS */
-int BindPanel(PANEL *p, const char *addr, const char *svc);
+int BindPanel(PANEL *p, const char *addr, const char *svc, int reuse);
 int SetDestination(PANEL *p, const char *addr, const char *svc);
 /* -- Functions for multicasting */
-int MakeMulticast(PANEL *p);
+int JoinMulticastGroup(PANEL *p, const char *ifaddr);
 int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr);
 int SetMulticastTTL(PANEL *p, int ttl);
 int SetMulticastLoopback(PANEL *p, int loopval);
@@ -111,9 +96,5 @@ void PrintAddrFamily(FILE *f, int af);
 void PrintAddrProtocol(FILE *f, int proto);
 void PrintAddrinfo(FILE *f, struct addrinfo *ai);
 void PrintAddr(FILE *f, struct sockaddr *sa);
-
-#ifdef _cplusplus
-}
-#endif
 
 #endif

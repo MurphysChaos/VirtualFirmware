@@ -1,6 +1,6 @@
 CC = gcc
 AR = ar rcs
-CFLAGS = -g -O2 #-fPIC
+CFLAGS = -g #-O2 #-fPIC
 OBJECTS = panel.o sockerr.o tinymsg.o opt.o
 LIBS = libpanel.a libsockerr.a libmessage.a libopt.a
 LDFLAGS = -L. -lmessage -lpanel -lsockerr -lopt

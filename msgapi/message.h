@@ -1,4 +1,5 @@
 #ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
 #pragma comment(lib, "Ws2_32.lib")
 #include <WinSock2.h>
 #include <WS2tcpip.h>
@@ -10,12 +11,15 @@
 #include <netdb.h>
 #include <errno.h>
 #include <stdint.h>
+#include <sys/time.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 typedef int SOCKET;
 #define FALSE 0
 #define TRUE 1
 #endif
 #include <stdio.h>
-#include <sys/time.h>
+#include <stdarg.h>
 #include "panel.h"
 #include "sockerr.h"
 #include "opt.h"
@@ -42,16 +46,16 @@ SOCKET announce(const char *optrc);
 SOCKET locate(const char *optrc);
 
 /*
- * sendmsg_withlength()
+ * senddata()
  * 
  * this function will send a message of raw bytes of a certain length
  * across the socket, by first sending the length in a fixed value
  * "header", then sending the buffer.
  */
-int sendmsg_withlength(SOCKET socket, void* data, uint16_t length);
+int senddata(SOCKET socket, void* data, uint16_t length);
 
 /*
- * recvmsg_withlength()
+ * recvdata()
  *
  * this function will receive a message from the socket
  * and put its value into the buffer. It will return an
@@ -61,4 +65,4 @@ int sendmsg_withlength(SOCKET socket, void* data, uint16_t length);
  * it will modify the length value to be the actual
  * length of the message returned.
  */
-int recvmsg_withlength(SOCKET socket, void* data, uint16_t* length);
+int recvdata(SOCKET socket, void* data, uint16_t* length);

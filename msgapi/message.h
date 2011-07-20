@@ -12,6 +12,8 @@
 #include <errno.h>
 #include <stdint.h>
 #include <sys/time.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 typedef int SOCKET;
 #define FALSE 0
 #define TRUE 1

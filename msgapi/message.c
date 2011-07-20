@@ -21,6 +21,132 @@ void dbg(int level, const char *msg, ...) {
   }
 }
 
+typedef struct if_panel {
+  PANEL *hs;
+  PANEL *cs;
+  char if_addr[NI_MAXHOST];
+} IF_PANEL;
+
+int buildIfPanel(IF_PANEL *p, const char *addr, struct sockaddr *sa) {
+  int rc = 0;
+
+  p->hs = CreatePanel(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (p->hs == NULL) {
+    return SOCKET_ERROR;
+  }
+
+  rc = BindPanel(p->hs, addr, OPT.mcastport, 1);
+  if (rc == SOCKET_ERROR) {
+    return rc;
+  }
+
+  rc = SetDestination(p->hs, OPT.mcastip, OPT.mcastport);
+  if (rc == SOCKET_ERROR) {
+    return rc;
+  }
+
+  rc = MakeMulticast(p->hs);
+  if (rc == SOCKET_ERROR) {
+    return rc;
+  }
+
+  rc = SetMulticastSendInterface(p->hs, sa);
+  if (rc == SOCKET_ERROR) {
+    return rc;
+  }
+
+  rc = SetMulticastTTL(p->hs, OPT.mcastttl);
+  if (rc == SOCKET_ERROR) {
+    return rc;
+  }
+
+  rc = SetMulticastLoopback(p->hs, 1);
+  if (rc == SOCKET_ERROR) {
+    return rc;
+  }
+
+  p->cs = CreatePanel(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (p->cs == NULL) {
+    return SOCKET_ERROR;
+  }
+
+  rc = BindPanel(p->cs, addr, OPT.tcpport, 1);
+  if (rc == SOCKET_ERROR) {
+    return rc;
+  }
+
+  strncpy(p->if_addr, addr, NI_MAXHOST);
+
+  return 0;
+}
+
+int populateInterfaceData(IF_PANEL *if_p, int *numIfs) {
+#ifdef _WIN32
+  set_error(ENOTSUP);
+  return SOCKET_ERROR;
+#else
+  struct ifaddrs *ifaddrs = NULL;
+  struct ifaddrs *ifa = NULL;
+
+  char addrString[NI_MAXHOST];
+
+  int numFoundIfs = 0;
+  int rc = 0;
+
+  rc = getifaddrs(&ifaddrs);
+  if (rc == SOCKET_ERROR) {
+    dbg(DBG_ERROR, "getifaddrs(): %s\n", sock_error());
+    return rc;
+  }
+
+  for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == NULL)
+      continue;
+
+    if (ifa->ifa_addr->sa_family != AF_INET)
+      continue;
+
+    if ((ifa->ifa_flags & IFF_UP) &&
+	(ifa->ifa_flags & IFF_MULTICAST) &&
+	!(ifa->ifa_flags & IFF_LOOPBACK)) {
+      /* If we get here, then we want to use this interface
+       * NOTE: first check that we have space. */
+      if ((numFoundIfs + 1) > *numIfs) {
+	numFoundIfs++;
+	continue;
+
+	rc = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), addrString, NI_MAXHOST, 0, 0, 0);
+	if (rc != 0) {
+	  rc = SOCKET_ERROR;
+	  goto err;
+	}
+
+	rc = buildIfPanel(&if_p[numFoundIfs], addrString, ifa->ifa_addr);
+	if (rc == SOCKET_ERROR) {
+	  goto err;
+	}
+	
+	// Increment the total number of interfaces
+	numFoundIfs++;
+      }
+    }
+  }
+  
+  /* Didn't have enough memory */
+  if (numFoundIfs > *numIfs) {
+    set_error(ENOMEM);
+    dbg(DBG_ERROR, "populateInterfaceData(): not enough memory\n");
+    rc = SOCKET_ERROR;
+  }
+
+  *numIfs = numFoundIfs;
+  return rc;
+  
+ err:
+  return rc;
+#endif
+}
+
 SOCKET announce(const char *optrc) {
   PANEL* hs = NULL;
   PANEL* cs = NULL;

@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
     if (bIsServer) {
         socket = announce(OPTRC_FILE);
         if (socket == INVALID_SOCKET) {
+            rc = -1;
             goto err;
         }
 
@@ -60,6 +61,7 @@ int main(int argc, char** argv) {
     } else {
         socket = locate(OPTRC_FILE);
         if (socket == INVALID_SOCKET) {
+            rc = -1;
             goto err;
         }
 
@@ -69,14 +71,6 @@ int main(int argc, char** argv) {
         }
     }
 
-#ifdef _WIN32
-	closesocket(socket);
-	WSACleanup();
-#else
-    close(socket);
-#endif
-    return 0;
-
 err:
 #ifdef _WIN32
 	closesocket(socket);
@@ -84,5 +78,5 @@ err:
 #else
     close(socket);
 #endif
-    return -1;
+    return rc;
 }

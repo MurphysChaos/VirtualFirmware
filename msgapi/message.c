@@ -88,8 +88,9 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
 int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
 #ifdef _WIN32
   SOCKET s;
-  int i, rc = 0, pc = 0, numFoundIfs = 0;
+  int numFoundIfs = 0, i, rc = 0, pc = 0;
   INTERFACE_INFO interfaces[32];
+  unsigned long nReturned = 0;
   
   s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (s == INVALID_SOCKET) {
@@ -104,7 +105,7 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
 		0,
 		&interfaces,
 		sizeof(INTERFACE_INFO) * 32,
-		(LPDWORD) &numFoundIfs,
+		&nReturned,
 		0,
 		0);
 
@@ -113,8 +114,8 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
     goto err;
   }
 
-  numFoundIfs /= sizeof(INTERFACE_INFO);
-  for (i = 0; i < numFoundIfs; i++) {
+  nReturned /= sizeof(INTERFACE_INFO);
+  for (i = 0; i < nReturned; i++) {
     INTERFACE_INFO *pIf = &interfaces[i];
     if ((pIf->iiFlags & IFF_UP) &&
 	(pIf->iiFlags & IFF_MULTICAST) &&
@@ -391,7 +392,7 @@ SOCKET locate(const char *optrc) {
     goto err;
   }
 
-  rc = BindPanel(hs, NULL, OPT.mcastport, 1);
+  rc = BindPanel(hs, OPT.mcastip, OPT.mcastport, 1);
   if(rc == SOCKET_ERROR) {
     dbg(DBG_ERROR, "BindPanel(hs), '%s'\n", sock_error());
     goto err;

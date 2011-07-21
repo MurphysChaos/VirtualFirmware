@@ -392,7 +392,7 @@ SOCKET locate(const char *optrc) {
     goto err;
   }
 
-  rc = BindPanel(hs, OPT.mcastip, OPT.mcastport, 1);
+  rc = BindPanel(hs, NULL, OPT.mcastport, 1);
   if(rc == SOCKET_ERROR) {
     dbg(DBG_ERROR, "BindPanel(hs), '%s'\n", sock_error());
     goto err;

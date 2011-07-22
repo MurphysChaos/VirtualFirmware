@@ -83,8 +83,10 @@ struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af, int type
 /* == MANIPULATOR FUNCTIONS */
 int BindPanel(PANEL *p, const char *addr, const char *svc, int reuse);
 int SetDestination(PANEL *p, const char *addr, const char *svc);
+int SetOptionLinger(PANEL *p, uint16_t opt_yesno, uint16_t opt_delay);
 /* -- Functions for multicasting */
 int JoinMulticastGroup(PANEL *p, const char *ifaddr);
+int LeaveMulticastGroup(PANEL *p, const char *ifaddr);
 int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr);
 int SetMulticastTTL(PANEL *p, int ttl);
 int SetMulticastLoopback(PANEL *p, int loopval);

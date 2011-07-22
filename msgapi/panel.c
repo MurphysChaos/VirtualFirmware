@@ -179,6 +179,9 @@ int SetDestination(PANEL *p, const char *addr, const char *svc) {
 	return NO_ERROR;
 }
 
+/* Sets the socket option with the linger structure. This doesn't work in 
+ * Windows.
+ */
 int SetOptionLinger(PANEL *p, uint16_t opt_yesno, uint16_t opt_delay) {
     int level, option, optlen;
     struct linger optval;
@@ -192,7 +195,17 @@ int SetOptionLinger(PANEL *p, uint16_t opt_yesno, uint16_t opt_delay) {
     optval.l_onoff = opt_yesno;
     optval.l_linger = opt_delay;
 
-    rc = setsockopt(p->sp_socket, level, option, (const char *) &optval, optlen);
+    rc = setsockopt(p->sp_socket, level, option, &optval, optlen);
+    return rc;
+}
+
+/* Used to set any true or false option
+ */
+int SetOption(PANEL *p, int level, int option, int optval) {
+    int optlen = sizeof(optval);
+    int rc;
+
+    rc = setsockopt(p->sp_socket, level, option, &optval, optlen);
     return rc;
 }
 

@@ -84,6 +84,7 @@ struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af, int type
 int BindPanel(PANEL *p, const char *addr, const char *svc, int reuse);
 int SetDestination(PANEL *p, const char *addr, const char *svc);
 int SetOptionLinger(PANEL *p, uint16_t opt_yesno, uint16_t opt_delay);
+int SetOption(PANEL *p, int level, int option, int optval);
 /* -- Functions for multicasting */
 int JoinMulticastGroup(PANEL *p, const char *ifaddr);
 int LeaveMulticastGroup(PANEL *p, const char *ifaddr);

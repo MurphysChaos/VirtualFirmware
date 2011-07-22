@@ -43,6 +43,11 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
         return SOCKET_ERROR;
     }
 
+    rc = SetOptionLinger(p->hs, 1, 0);
+    if (rc == SOCKET_ERROR) {
+        return rc;
+    }
+
     rc = BindPanel(p->hs, i->if_addr, OPT.mcastport, 1);
     if (rc == SOCKET_ERROR) {
         return rc;
@@ -76,6 +81,11 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
     p->cs = CreatePanel(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (p->cs == NULL) {
         return SOCKET_ERROR;
+    }
+
+    rc = SetOptionLinger(p->cs, 1, 0);
+    if (rc == SOCKET_ERROR) {
+        return rc;
     }
 
     rc = BindPanel(p->cs, i->if_addr, OPT.tcpport, 1);
@@ -114,6 +124,9 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
         dbg(DBG_ERROR, "SIO_GET_INTERFACE_LIST: '%s'\n", sock_error());
         goto err;
     }
+
+    shutdown(s, SD_BOTH);
+    closesocket(s);
 
     nReturned /= sizeof(INTERFACE_INFO);
     for (i = 0; i < nReturned; i++) {
@@ -239,21 +252,16 @@ SOCKET announce(const char *optrc) {
     IF_PANEL ifp[MAX_IF_LENGTH];
     IF_DATA ifd[MAX_IF_LENGTH];
     int ifd_length = MAX_IF_LENGTH;
-
     fd_set readfds;
     struct timeval tv;
     int num_packets = 0;
     int count = 0;
-
     int maxSocket = 0;
-
     char addr[NI_MAXHOST];
-
     struct announce_msg m;
-
     socklen_t acceptlen;
+    int accepted = 0;
     int i;
-
     SOCKET socket = INVALID_SOCKET;
     int rc = 0;
 
@@ -268,7 +276,7 @@ SOCKET announce(const char *optrc) {
     }
 
     /* We have the interface data in useable form
-    * Now we can build the interface panels */
+     * Now we can build the interface panels */
     for (i = 0; i < ifd_length; i++) {
         rc = buildIfPanel(&ifp[i], &ifd[i]);
         if (rc == SOCKET_ERROR) {
@@ -328,6 +336,7 @@ SOCKET announce(const char *optrc) {
                 if (FD_ISSET(ifp[i].cs->sp_socket, &readfds)) {
                     acceptlen = sizeof(struct sockaddr);
                     socket = accept(ifp[i].cs->sp_socket, &(ifp[i].cs->sp_dest), &acceptlen);
+                    accepted = i;
                     dbg(DBG_STATUS, "connected to %s\n", FormatAddr(&(ifp[i].cs->sp_dest), addr, NI_MAXHOST));
                     break;
                 }
@@ -341,12 +350,16 @@ SOCKET announce(const char *optrc) {
     }
 
     for (i = 0; i < ifd_length; i++) {
-        FreePanel(ifp[i].hs);
         if (socket == ifp[i].cs->sp_socket) {
             DissociatePanel(ifp[i].cs);
         } else {
             FreePanel(ifp[i].cs);
         }
+        rc = LeaveMulticastGroup(ifp[i].hs, NULL);
+        if (rc == SOCKET_ERROR) {
+            goto err;
+        }
+        FreePanel(ifp[i].hs);
     } 
 
     return socket;

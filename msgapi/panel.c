@@ -83,8 +83,11 @@ PANEL *SocketToPanel(int s, struct sockaddr *addr) {
 /* Nicely cleans up after an unused panel.
  */
 void FreePanel(PANEL *p) {
+    int rc;
+
 	if (p) {
 #ifdef _WIN32
+        shutdown(p->sp_socket, SD_BOTH);
 		closesocket(p->sp_socket);
 #else
 		close(p->sp_socket);
@@ -176,6 +179,23 @@ int SetDestination(PANEL *p, const char *addr, const char *svc) {
 	return NO_ERROR;
 }
 
+int SetOptionLinger(PANEL *p, uint16_t opt_yesno, uint16_t opt_delay) {
+    int level, option, optlen;
+    struct linger optval;
+    int rc;
+
+    optlen = sizeof(optval);
+    memset((void *) &optval, 0, optlen);
+
+    level = SOL_SOCKET;
+    option = SO_LINGER;
+    optval.l_onoff = opt_yesno;
+    optval.l_linger = opt_delay;
+
+    rc = setsockopt(p->sp_socket, level, option, (const char *) &optval, optlen);
+    return rc;
+}
+
 /* Make an existing panel into a multicast panel by joining the multicast group
  * and setting the send interface. Uses p->sp_dest which must be set prior to 
  * calling.
@@ -229,6 +249,60 @@ int JoinMulticastGroup(PANEL *p, const char *ifaddr) {
 	}
 
 	sp_setflag(p->sp_flags,SP_F_MULTICAST);
+	return rc;
+}
+
+/* Gracefully leave the multicast group.
+ */
+int LeaveMulticastGroup(PANEL *p, const char *ifaddr) {
+	int level, option, optlen;
+	char *optval;
+	int rc;
+
+	if ((p->sp_dest.sa_family == AF_INET) || (p->sp_dest.sa_family == AF_UNSPEC)) {
+		struct ip_mreq mreq;
+		struct sockaddr_in *sin = (struct sockaddr_in *) &(p->sp_dest);
+		struct sockaddr_in *sbind = (struct sockaddr_in *) &(p->sp_bind);
+
+		// IPv4 multicast membership parameters
+		level = IPPROTO_IP;
+		option = IP_DROP_MEMBERSHIP;
+		optval = (char *) &mreq;
+		optlen = sizeof (mreq);
+		mreq.imr_multiaddr.s_addr = sin->sin_addr.s_addr;
+		if (ifaddr) {
+			inet_pton(AF_INET,  ifaddr, &mreq.imr_interface.s_addr);
+		} else {
+			mreq.imr_interface.s_addr = sbind->sin_addr.s_addr;
+		}
+	} else if (p->sp_dest.sa_family == AF_INET6) {
+		struct ipv6_mreq mreq6;
+		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) &(p->sp_dest);
+
+		// IPv6 multicast membership parameters
+		level = IPPROTO_IPV6;
+		option = IPV6_DROP_MEMBERSHIP;
+		optval = (char *) &mreq6;
+		optlen = sizeof (mreq6);
+#ifdef _WIN32
+		sin6->sin6_scope_id = ScopeLevelSubnet;
+#else
+		sin6->sin6_scope_id = 0;
+#endif
+		mreq6.ipv6mr_multiaddr = sin6->sin6_addr;
+		mreq6.ipv6mr_interface = sin6->sin6_scope_id;
+	} else {
+		set_error(EAFNOSUPPORT); // Address family not supported
+		return SOCKET_ERROR;
+	}
+
+	// Join multicast group
+	rc = setsockopt(p->sp_socket, level, option, optval, optlen);
+	if (rc == SOCKET_ERROR) {
+		return SOCKET_ERROR;
+	}
+
+	sp_clearflag(p->sp_flags,SP_F_MULTICAST);
 	return rc;
 }
 

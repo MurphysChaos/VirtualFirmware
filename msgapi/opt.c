@@ -56,7 +56,7 @@ void ReadOptions(const char *filename) {
         }
         
         if(fclose(f)) {
-            fprintf(stderr, "Failed to close %s.", filename);
+            fprintf(stderr, "Failed to close %s.\n", filename);
         }
     }
 }

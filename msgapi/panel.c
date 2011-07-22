@@ -205,7 +205,7 @@ int SetOption(PANEL *p, int level, int option, int optval) {
     int optlen = sizeof(optval);
     int rc;
 
-    rc = setsockopt(p->sp_socket, level, option, &optval, optlen);
+    rc = setsockopt(p->sp_socket, level, option, (const char *) &optval, optlen);
     return rc;
 }
 

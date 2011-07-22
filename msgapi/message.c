@@ -43,11 +43,6 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
         return SOCKET_ERROR;
     }
 
-    rc = SetOptionLinger(p->hs, 1, 0);
-    if (rc == SOCKET_ERROR) {
-        return rc;
-    }
-
     rc = BindPanel(p->hs, i->if_addr, OPT.mcastport, 1);
     if (rc == SOCKET_ERROR) {
         return rc;
@@ -81,11 +76,6 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
     p->cs = CreatePanel(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (p->cs == NULL) {
         return SOCKET_ERROR;
-    }
-
-    rc = SetOptionLinger(p->cs, 1, 0);
-    if (rc == SOCKET_ERROR) {
-        return rc;
     }
 
     rc = BindPanel(p->cs, i->if_addr, OPT.tcpport, 1);

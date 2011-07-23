@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="e1000.h" />
     <ClInclude Include="message.h" />
     <ClInclude Include="opt.h" />
     <ClInclude Include="panel.h" />
@@ -27,7 +28,7 @@
     <ClCompile Include="wsa_strerror.c" />
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\tx.lib" />
+    <Library Include="tx.lib" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{D5A807C7-A5AC-453B-8345-3CFCD748E902}</ProjectGuid>
@@ -69,6 +70,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

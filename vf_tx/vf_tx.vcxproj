@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="dbg.h" />
     <ClInclude Include="e1000.h" />
     <ClInclude Include="message.h" />
     <ClInclude Include="opt.h" />
@@ -20,6 +21,7 @@
     <ClInclude Include="wsa_strerror.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="dbg.c" />
     <ClCompile Include="message.c" />
     <ClCompile Include="opt.c" />
     <ClCompile Include="panel.c" />

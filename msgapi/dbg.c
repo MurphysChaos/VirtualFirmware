@@ -1,3 +1,6 @@
+#include "dbg.h"
+#include "opt.h"
+
 void dbg(int level, const char *msg, ...) {
     if (OPT.dbglvl >= level) {
         va_list args;

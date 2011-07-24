@@ -110,6 +110,8 @@ void t_0_entry(ULONG t_input) {
     UINT dat_length;
     int rc;
 
+    dbg(DBG_ALL, "Entering thread t_0.\n");
+
     while (1) {
         msg_length = 32;
         rc = recvdata(g_sock, &aq, (uint16_t *) &msg_length); 
@@ -127,28 +129,36 @@ void t_0_entry(ULONG t_input) {
 
             switch(aq.opcode) {
             case e1000_aqc_get_version:
+                dbg(DBG_ALL, "Message: e1000_aqc_get_version\n");
                 e1000_aq_get_version(&aq);
+                dbg(DBG_ALL, "  Set param0: %u\n      param1: %u\n", aq.param0, aq.param1);
                 rc = senddata(g_sock, &aq, msg_length);
                 if (rc == SOCKET_ERROR) {
                     dbg(DBG_ERROR, "SENDDATA (get_version:message): %s\n", sock_error());
+                    break;
                 }
                 break;
             case e1000_aqc_driver_heartbeat:
+                dbg(DBG_ALL, "Message: e1000_aqc_driver_heartbeat\n");
                 e1000_aq_driver_heartbeat(&aq);
                 rc = senddata(g_sock, &aq, msg_length);
                 if (rc == SOCKET_ERROR) {
                     dbg(DBG_ERROR, "SENDDATA (driver_heartbeat:message): %s\n", sock_error());
+                    break;
                 }
                 break;
             case e1000_aqc_echo:
+                dbg(DBG_ALL, "Message: e1000_aqc_echo\n");
                 e1000_aq_echo(&aq, buffer);
                 rc = senddata(g_sock, &aq, msg_length);
                 if (rc == SOCKET_ERROR) {
                     dbg(DBG_ERROR, "SENDDATA (echo:message): %s\n", sock_error());
+                    break;
                 }
                 rc = senddata(g_sock, buffer, dat_length);
                 if (rc == SOCKET_ERROR) {
                     dbg(DBG_ERROR, "SENDDATA (echo:buffer): %s\n", sock_error());
+                    break;
                 }
                 break;
             }

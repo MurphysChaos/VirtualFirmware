@@ -52,7 +52,7 @@ int main()
     /* Initialize Winsock */
     rc = WSAStartup(MAKEWORD(2,2), &wsaData);
     if (rc != 0) {
-        printf("WSAStartup failed with error: %d\n", rc);
+        dbg(DBG_ERROR, "WSAStartup failed with error: %d\n", rc);
         goto err;
     }
     g_sock = announce(OPTRC_FILE);
@@ -114,14 +114,14 @@ void t_0_entry(ULONG t_input) {
         msg_length = 32;
         rc = recvdata(g_sock, &aq, (uint16_t *) &msg_length); 
         if (rc == SOCKET_ERROR) {
-            fprintf(stderr, "RECVDATA (message): %s\n", sock_error());
+            dbg(DBG_ERROR, "RECVDATA (message): %s\n", sock_error());
         } else {
             dat_length = aq.datalen;
 
             if(dat_length) {
                 rc = recvdata(g_sock, buffer, (uint16_t *) &dat_length);
                 if (rc == SOCKET_ERROR) {
-                    fprintf(stderr, "RECVDATA (buffer): %s\n", sock_error());
+                    dbg(DBG_ERROR, "RECVDATA (buffer): %s\n", sock_error());
                 }
             }
 
@@ -130,25 +130,25 @@ void t_0_entry(ULONG t_input) {
                 e1000_aq_get_version(&aq);
                 rc = senddata(g_sock, &aq, msg_length);
                 if (rc == SOCKET_ERROR) {
-                    fprintf(stderr, "SENDDATA (get_version:message): %s\n", sock_error());
+                    dbg(DBG_ERROR, "SENDDATA (get_version:message): %s\n", sock_error());
                 }
                 break;
             case e1000_aqc_driver_heartbeat:
                 e1000_aq_driver_heartbeat(&aq);
                 rc = senddata(g_sock, &aq, msg_length);
                 if (rc == SOCKET_ERROR) {
-                    fprintf(stderr, "SENDDATA (driver_heartbeat:message): %s\n", sock_error());
+                    dbg(DBG_ERROR, "SENDDATA (driver_heartbeat:message): %s\n", sock_error());
                 }
                 break;
             case e1000_aqc_echo:
                 e1000_aq_echo(&aq, buffer);
                 rc = senddata(g_sock, &aq, msg_length);
                 if (rc == SOCKET_ERROR) {
-                    fprintf(stderr, "SENDDATA (echo:message): %s\n", sock_error());
+                    dbg(DBG_ERROR, "SENDDATA (echo:message): %s\n", sock_error());
                 }
                 rc = senddata(g_sock, buffer, dat_length);
                 if (rc == SOCKET_ERROR) {
-                    fprintf(stderr, "SENDDATA (echo:buffer): %s\n", sock_error());
+                    dbg(DBG_ERROR, "SENDDATA (echo:buffer): %s\n", sock_error());
                 }
                 break;
             }

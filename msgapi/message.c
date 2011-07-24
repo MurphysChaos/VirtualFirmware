@@ -9,19 +9,6 @@ struct announce_msg {
 
 #define PACKETS_PER_SEC 10
 
-#define DBG_STATUS 1
-#define DBG_ERROR  2
-#define DBG_ALL    3
-
-void dbg(int level, const char *msg, ...) {
-    if (OPT.dbglvl >= level) {
-        va_list args;
-        va_start(args, msg);
-        vfprintf(stderr, msg, args);
-        va_end(args);
-    }
-}
-
 typedef struct if_panel {
     PANEL *hs;
     PANEL *cs;

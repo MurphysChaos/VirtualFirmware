@@ -387,16 +387,16 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 	}
 
 	/* descriptor has a buffer, send it also */
-	if (desc.datalen > 0) {
-		buffer_addr = ((uint64_t)(desc.addr_high) << 32) | desc.addr_low;
+	if (desc->datalen > 0) {
+		buffer_addr = ((uint64_t)(desc->addr_high) << 32) | desc->addr_low;
 		buffer = qemu_malloc(desc->datalen);
 		if (!buffer) {
 			return -1;
 		}
 
-		cpu_physical_memory_read(buffer_addr, (void *)buffer, desc.datalen);
+		cpu_physical_memory_read(buffer_addr, (void *)buffer, desc->datalen);
 
-		rc = senddata(s->fs, buffer, desc.datalen);
+		rc = senddata(s->fs, buffer, desc->datalen);
 		if (rc < 0) {
 			qemu_free(buffer);
 			return rc;
@@ -412,20 +412,20 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 	}
 
 	/* descriptor has a return buffer, recv it */
-	if (desc.datalen > 0) {
-		buffer_addr = ((uint64_t)(desc.addr_high) << 32) | desc.addr_low;
+	if (recv_desc.datalen > 0) {
+		buffer_addr = ((uint64_t)(recv_desc.addr_high) << 32) | recv_desc.addr_low;
 		buffer = qemu_malloc(desc->datalen);
 		if (!buffer) {
 			return -1;
 		}
 
-		recv_size = desc.datalen;
+		recv_size = recv_desc.datalen;
 		rc = recvdata(s->fs, buffer, &recv_size);
 		if (rc < 0) {
 			qemu_free(buffer);
 			return rc;
 		}
-		cpu_physical_memory_write(buffer_addr, (void *)buffer, desc.datalen);
+		cpu_physical_memory_write(buffer_addr, (void *)buffer, recv_desc.datalen);
 		qemu_free(buffer);
 	}
 

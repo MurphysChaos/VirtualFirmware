@@ -364,13 +364,15 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 {
 	struct e1000_aq_desc recv_desc;
 	uint16_t recv_size = sizeof(recv_desc);
+	target_phys_addr_t buffer_addr;
+	uint8_t *buffer;
 	int rc = 0;
 
 	memset(&recv_desc, 0, sizeof(recv_desc));
 
 	/* attempt to make connection */
 	if (s->fs == INVALID_SOCKET) {
-		s->fs = locate(0xe1000);
+		s->fs = locate("/tmp/e1000.optrc");
 		if (s->fs == INVALID_SOCKET) {
 			// Failure to make connection
 			return -1;
@@ -378,17 +380,53 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 	}
 
 	/* We have a valid socket here */
-	rc = sendmsg_withlength(s->fs, desc, sizeof(desc));
+	rc = senddata(s->fs, desc, sizeof(desc));
 	if (rc < 0) {
 		/* failed to send the message */
 		return rc;
 	}
 
+	/* descriptor has a buffer, send it also */
+	if (desc.datalen > 0) {
+		buffer_addr = ((uint64_t)(desc.addr_high) << 32) | desc.addr_low;
+		buffer = qemu_malloc(desc->datalen);
+		if (!buffer) {
+			return -1;
+		}
+
+		cpu_physical_memory_read(buffer_addr, (void *)buffer, desc.datalen);
+
+		rc = senddata(s->fs, buffer, desc.datalen);
+		if (rc < 0) {
+			qemu_free(buffer);
+			return rc;
+		}
+		qemu_free(buffer);
+	}
+
 	/* Firmware has message, wait for response */
-	rc = recvmsg_withlength(s->fs, &recv_desc, &recv_size);
+	rc = recvdata(s->fs, &recv_desc, &recv_size);
 	if (rc < 0) {
 		/* failed to receive firmware response */
 		return rc;
+	}
+
+	/* descriptor has a return buffer, recv it */
+	if (desc.datalen > 0) {
+		buffer_addr = ((uint64_t)(desc.addr_high) << 32) | desc.addr_low;
+		buffer = qemu_malloc(desc->datalen);
+		if (!buffer) {
+			return -1;
+		}
+
+		recv_size = desc.datalen;
+		rc = recvdata(s->fs, buffer, &recv_size);
+		if (rc < 0) {
+			qemu_free(buffer);
+			return rc;
+		}
+		cpu_physical_memory_write(buffer_addr, (void *)buffer, desc.datalen);
+		qemu_free(buffer);
 	}
 
 	/* Got a valid descriptor back */

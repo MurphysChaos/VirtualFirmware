@@ -20,6 +20,9 @@ typedef struct if_data {
     struct sockaddr sa;
 } IF_DATA;
 
+int buildIfPanel(IF_PANEL *p, IF_DATA *i);
+int populateInterfaceData(IF_DATA *if_d, int *numIfs);
+
 int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
     int rc = 0;
 
@@ -215,10 +218,6 @@ err:
     }
 
     *numIfs = numFoundIfs;
-    freeifaddrs(ifaddrs);
-    return rc;
-
-err:
     freeifaddrs(ifaddrs);
     return rc;
 #endif

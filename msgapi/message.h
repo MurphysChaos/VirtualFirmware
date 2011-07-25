@@ -23,6 +23,7 @@ typedef int SOCKET;
 #include "panel.h"
 #include "sockerr.h"
 #include "opt.h"
+#include "dbg.h"
 
 /*
  * anounce()

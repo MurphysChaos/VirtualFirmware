@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
         p[pc] = SocketToPanel(socket(AF_INET, SOCK_DGRAM, IPPROTO_IP), &(pIf->iiAddress.Address));
         rc = BindPanel(p[pc], ipaddr, OPT.mcastport, 1);
         rc = SetDestination(p[pc], OPT.mcastip, OPT.mcastport);
-        rc = JoinMulticastGroup(p[pc]);
+        rc = JoinMulticastGroup(p[pc], NULL);
         rc = SetMulticastSendInterface(p[pc], &(pIf->iiAddress.Address));
         rc = SetMulticastTTL(p[pc], OPT.mcastttl);
         rc = SetMulticastLoopback(p[pc], 1);

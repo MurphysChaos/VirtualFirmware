@@ -33,6 +33,12 @@
     <ClInclude Include="wsa_strerror.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="e1000.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dbg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vf_tx.c">
@@ -53,9 +59,12 @@
     <ClCompile Include="wsa_strerror.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="dbg.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\tx.lib">
+    <Library Include="tx.lib">
       <Filter>Resource Files</Filter>
     </Library>
   </ItemGroup>

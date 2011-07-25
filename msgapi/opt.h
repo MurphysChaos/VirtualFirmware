@@ -1,5 +1,6 @@
 #ifndef OPT_H_
 #define OPT_H_
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -14,8 +15,8 @@
 #define MULTICAST_TTL 1
 #define MAGIC_NUMBER 0xe1000
 #define TCP_PORT "9752"
-#define CONNECT_TIMEOUT 10
-#define DBGLVL 0
+#define CONNECT_TIMEOUT 0 //10
+#define DBGLVL 3 //0
 
 /*
  * A structure for handling options.

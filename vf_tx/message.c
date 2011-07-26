@@ -556,7 +556,7 @@ int recvdata(SOCKET socket, void* data, uint16_t* length)
         return -1;
     } else if (rc < 0) {
         return -1;
-    } else if (rc != sizeof(uint16_t)) {
+    } else if (rc != sizeof(struct msg_header)) {
         set_error(ECANCELED);
         return -1;
     }

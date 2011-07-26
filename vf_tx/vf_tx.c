@@ -116,7 +116,7 @@ void t_0_entry(ULONG t_input) {
     while (1) {
         msg_length = sizeof (desc);
         rc = recvdata(g_sock, &desc, (uint16_t *) &msg_length); 
-        dbg(DBG_WARN, "Received size: %d\n", msg_length);
+        dbg(DBG_VERB, "Received size: %d\n", msg_length);
         if (rc == SOCKET_ERROR) {
             dbg(DBG_ERROR, "RECVDATA (message): %s\n", sock_error());
         } else {
@@ -124,7 +124,7 @@ void t_0_entry(ULONG t_input) {
 
             if(dat_length) {
                 rc = recvdata(g_sock, buffer, (uint16_t *) &dat_length);
-                dbg(DBG_WARN, "Received size: %d\n", dat_length);
+                dbg(DBG_VERB, "Received size: %d\n", dat_length);
                 if (rc == SOCKET_ERROR) {
                     dbg(DBG_ERROR, "RECVDATA (buffer): %s\n", sock_error());
                 }
@@ -134,7 +134,7 @@ void t_0_entry(ULONG t_input) {
             case e1000_aqc_get_version:
                 dbg(DBG_WARN, "Message: e1000_aqc_get_version\n");
                 e1000_aq_get_version(&desc);
-                dbg(DBG_WARN, "  Set param0: %u\n      param1: %u\n", desc.param0, desc.param1);
+                dbg(DBG_VERB, "  Set param0: %u\n      param1: %u\n", desc.param0, desc.param1);
                 break;
             case e1000_aqc_driver_heartbeat:
                 dbg(DBG_WARN, "Message: e1000_aqc_driver_heartbeat\n");
@@ -152,18 +152,18 @@ void t_0_entry(ULONG t_input) {
 
             desc.flags |= E1000_AQ_FLAG_DD;
 
-            dbg(DBG_WARN, "Sending: desc\n");
-            dbg(DBG_WARN, "\t.flags=0x%x (%d)\n", desc.flags, desc.flags);
-            dbg(DBG_WARN, "\t.opcode=0x%x (%d)\n", desc.opcode, desc.opcode);
-            dbg(DBG_WARN, "\t.datalen=0x%x (%d)\n", desc.datalen, desc.datalen);
-            dbg(DBG_WARN, "\t.retval=0x%x (%d)\n", desc.retval, desc.retval);
-            dbg(DBG_WARN, "\t.cookie_high=0x%x (%d)\n", desc.cookie_high, desc.cookie_high);
-            dbg(DBG_WARN, "\t.cookie_low=0x%x (%d)\n", desc.cookie_low, desc.cookie_low);
-            dbg(DBG_WARN, "\t.param0=0x%x (%d)\n", desc.param0, desc.param0);
-            dbg(DBG_WARN, "\t.param1=0x%x (%d)\n", desc.param1, desc.param1);
-            dbg(DBG_WARN, "\t.addr_high=0x%x (%d)\n", desc.addr_high, desc.addr_high);
-            dbg(DBG_WARN, "\t.addr_low=0x%x (%d)\n", desc.addr_low, desc.addr_low);
-            dbg(DBG_WARN, "msg_length=0x%x (%d)\n", msg_length, msg_length);
+            dbg(DBG_VERB, "Sending: desc\n");
+            dbg(DBG_VERB, "\t.flags=0x%x (%d)\n", desc.flags, desc.flags);
+            dbg(DBG_VERB, "\t.opcode=0x%x (%d)\n", desc.opcode, desc.opcode);
+            dbg(DBG_VERB, "\t.datalen=0x%x (%d)\n", desc.datalen, desc.datalen);
+            dbg(DBG_VERB, "\t.retval=0x%x (%d)\n", desc.retval, desc.retval);
+            dbg(DBG_VERB, "\t.cookie_high=0x%x (%d)\n", desc.cookie_high, desc.cookie_high);
+            dbg(DBG_VERB, "\t.cookie_low=0x%x (%d)\n", desc.cookie_low, desc.cookie_low);
+            dbg(DBG_VERB, "\t.param0=0x%x (%d)\n", desc.param0, desc.param0);
+            dbg(DBG_VERB, "\t.param1=0x%x (%d)\n", desc.param1, desc.param1);
+            dbg(DBG_VERB, "\t.addr_high=0x%x (%d)\n", desc.addr_high, desc.addr_high);
+            dbg(DBG_VERB, "\t.addr_low=0x%x (%d)\n", desc.addr_low, desc.addr_low);
+            dbg(DBG_VERB, "msg_length=0x%x (%d)\n", msg_length, msg_length);
             rc = senddata(g_sock, &desc, msg_length);
             if (rc == SOCKET_ERROR) {
                 dbg(DBG_ERROR, "SENDDATA (message): %s\n", sock_error());

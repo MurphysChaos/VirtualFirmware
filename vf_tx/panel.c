@@ -20,7 +20,6 @@ PANEL *CreateEmptyPanel(void) {
 	// Prepare necessary memory
 	p = (PANEL *) malloc(ps);
 	if (p == NULL) {
-		fprintf(stderr, "Failed to allocate memory for panel.\n");
 		return NULL;
 	}
 	memset(p, 0, ps);

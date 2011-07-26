@@ -500,7 +500,7 @@ int senddata(SOCKET socket, void* data, uint16_t length)
         return -1;
     }
 
-    dbg(DBG_WARN, "senddata: send length=%u\n", length);
+    dbg(DBG_VERB, "senddata: send length=%u\n", length);
 
     rc = send(socket, data, length, 0);
     if (rc == 0) {
@@ -557,7 +557,7 @@ int recvdata(SOCKET socket, void* data, uint16_t* length)
         return -1;
     }
 
-    dbg(DBG_WARN, "recvdata: recv length %u\n", msg_length);
+    dbg(DBG_VERB, "recvdata: recv length %u\n", msg_length);
 
     /* receive the raw data
     * now we actually retrieve the data

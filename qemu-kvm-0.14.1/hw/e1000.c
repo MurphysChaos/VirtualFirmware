@@ -370,20 +370,22 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 
 	memset(&recv_desc, 0, sizeof(recv_desc));
 
+	fprintf(e1000_log, "%s: command 0x%02x\n", __func__, desc->opcode);
+
 	/* attempt to make connection */
 	if (s->fs == INVALID_SOCKET) {
 		s->fs = locate("/tmp/e1000.optrc");
 		if (s->fs == INVALID_SOCKET) {
 			// Failure to make connection
-			return -1;
+			goto err;
 		}
 	}
 
 	/* We have a valid socket here */
-	rc = senddata(s->fs, desc, sizeof(desc));
+	rc = senddata(s->fs, desc, sizeof(struct e1000_aq_desc));
 	if (rc < 0) {
 		/* failed to send the message */
-		return rc;
+		goto err;
 	}
 
 	/* descriptor has a buffer, send it also */
@@ -391,7 +393,7 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 		buffer_addr = ((uint64_t)(desc->addr_high) << 32) | desc->addr_low;
 		buffer = qemu_malloc(desc->datalen);
 		if (!buffer) {
-			return -1;
+			goto err;
 		}
 
 		cpu_physical_memory_read(buffer_addr, (void *)buffer, desc->datalen);
@@ -399,16 +401,17 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 		rc = senddata(s->fs, buffer, desc->datalen);
 		if (rc < 0) {
 			qemu_free(buffer);
-			return rc;
+			goto err;
 		}
 		qemu_free(buffer);
 	}
 
+	recv_size = sizeof(recv_desc);
 	/* Firmware has message, wait for response */
 	rc = recvdata(s->fs, &recv_desc, &recv_size);
 	if (rc < 0) {
 		/* failed to receive firmware response */
-		return rc;
+		goto err;
 	}
 
 	/* descriptor has a return buffer, recv it */
@@ -416,23 +419,41 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 		buffer_addr = ((uint64_t)(recv_desc.addr_high) << 32) | recv_desc.addr_low;
 		buffer = qemu_malloc(desc->datalen);
 		if (!buffer) {
-			return -1;
+			goto err;
 		}
 
 		recv_size = recv_desc.datalen;
 		rc = recvdata(s->fs, buffer, &recv_size);
 		if (rc < 0) {
 			qemu_free(buffer);
-			return rc;
+			goto err;
 		}
 		cpu_physical_memory_write(buffer_addr, (void *)buffer, recv_desc.datalen);
 		qemu_free(buffer);
 	}
 
+	fprintf(e1000_log, "%s: recv_desc\n", __func__);
+	fprintf(e1000_log, "%s: flags=%u\n", __func__, recv_desc.flags);
+	fprintf(e1000_log, "%s: opcode=%u\n", __func__, recv_desc.opcode);
+	fprintf(e1000_log, "%s: datalen=%u\n", __func__, recv_desc.datalen);
+	fprintf(e1000_log, "%s: cookie_high=%u\n", __func__, recv_desc.cookie_high);
+	fprintf(e1000_log, "%s: cookie_low=%u\n", __func__, recv_desc.cookie_low);
+	fprintf(e1000_log, "%s: param0=%u\n", __func__, recv_desc.param0);
+	fprintf(e1000_log, "%s: param1=%u\n", __func__, recv_desc.param1);
+	fprintf(e1000_log, "%s: addr_high=%u\n", __func__, recv_desc.addr_high);
+	fprintf(e1000_log, "%s: addr_low=%u\n", __func__, recv_desc.addr_low);
+	fprintf(e1000_log, "%s: message_length=%u\n", __func__, recv_size);
+	fprintf(e1000_log, "%s: expected size=%lu\n", __func__, sizeof(recv_desc));
+	
 	/* Got a valid descriptor back */
 	memcpy(desc, &recv_desc, sizeof(recv_desc));
-
 	return 0;
+
+ err:
+	fprintf(e1000_log, "%s: command 0x%02x failed\n", __func__, desc->opcode);
+	close(s->fs);
+	s->fs = INVALID_SOCKET;
+	return -1;
 }
 
 static void e1000_set_atq_tail(E1000State *s, int index, uint32_t val)

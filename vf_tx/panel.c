@@ -43,7 +43,7 @@ PANEL *CreatePanel(int af, int type, int proto) {
 	p->sp_family = af;
 	p->sp_socktype = type;
 	p->sp_protocol = proto;
-	p->sp_flags = sp_setflag(p->sp_flags, SP_F_VALID);
+	sp_setflag(p->sp_flags, SP_F_VALID);
 
 	return p;
 }
@@ -74,7 +74,7 @@ PANEL *SocketToPanel(int s, struct sockaddr *addr) {
 	// Copy received data
 	p->sp_socket = s;
 	memcpy(&(p->sp_bind), addr, sizeof (addr));
-	p->sp_flags = sp_setflag(p->sp_flags, SP_F_VALID);
+	sp_setflag(p->sp_flags, SP_F_VALID);
     
 	return p;
 }
@@ -82,8 +82,6 @@ PANEL *SocketToPanel(int s, struct sockaddr *addr) {
 /* Nicely cleans up after an unused panel.
  */
 void FreePanel(PANEL *p) {
-    int rc;
-
 	if (p) {
 #ifdef _WIN32
         shutdown(p->sp_socket, SD_BOTH);

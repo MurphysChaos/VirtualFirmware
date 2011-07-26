@@ -18,6 +18,8 @@ tx_port.h
 *.sln
 *.suo
 
-# QEMU ignores
+# Adding a hard link to the msgapi folder
 qemu-kvm-0.14.1/hw/msg
 qemu-kvm-0.14.1/hw/msg/*
+qemu-kvm-0.14.1/make_output.txt
+

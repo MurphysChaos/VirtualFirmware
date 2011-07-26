@@ -53,11 +53,6 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
         return rc;
     }
 
-    rc = SetMulticastTTL(p->hs, OPT.mcastttl);
-    if (rc == SOCKET_ERROR) {
-        return rc;
-    }
-
     rc = SetMulticastLoopback(p->hs, 1);
     if (rc == SOCKET_ERROR) {
         return rc;
@@ -401,11 +396,6 @@ SOCKET locate(const char *optrc) {
             dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
             goto err;
         }
-    }
-    rc = SetMulticastTTL(hs, OPT.mcastttl);
-    if (rc == SOCKET_ERROR) {
-        dbg(DBG_ERROR, "SetMulticastTTL(hs): %s\n", sock_error());
-        goto err;
     }
 
     rc = SetMulticastLoopback(hs, 1);

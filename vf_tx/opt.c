@@ -23,7 +23,6 @@ void ReadOptions(const char *filename) {
     strcpy(OPT.mcastip, MULTICAST_ADDR);
     strcpy(OPT.mcastport, MULTICAST_PORT);
     strcpy(OPT.tcpport, TCP_PORT);
-    OPT.mcastttl = MULTICAST_TTL;
     OPT.magicnum = MAGIC_NUMBER;
     OPT.timeout = CONNECT_TIMEOUT;
     OPT.dbglvl = DBGLVL;
@@ -41,8 +40,6 @@ void ReadOptions(const char *filename) {
                     strcpy(OPT.mcastip, eqpos+1);
                 } else if (strcmp(line, "mcastport") == 0) {
                     strcpy(OPT.mcastport, eqpos+1);
-                } else if (strcmp(line, "mcastttl") == 0) {
-                    OPT.mcastttl = atoi(eqpos + 1);
                 } else if (strcmp(line, "tcpport") == 0) {
                     strcpy(OPT.tcpport, eqpos+1);
                 } else if (strcmp(line, "magicnum") == 0) {

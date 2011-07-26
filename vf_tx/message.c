@@ -7,6 +7,11 @@ struct announce_msg {
     uint16_t flags; // reserved
 };
 
+struct msg_header {
+    uint16_t length;
+    uint32_t sum;
+};
+
 #define PACKETS_PER_SEC 10
 
 typedef struct if_panel {
@@ -22,6 +27,7 @@ typedef struct if_data {
 
 int buildIfPanel(IF_PANEL *p, IF_DATA *i);
 int populateInterfaceData(IF_DATA *if_d, int *numIfs);
+uint32_t chksum(uint8_t *data, uint16_t length);
 
 int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
     int rc = 0;
@@ -472,17 +478,45 @@ err:
     return INVALID_SOCKET;
 }
 
+uint32_t chksum(uint8_t *data, uint16_t length) {
+    uint32_t sum = 0;
+    uint32_t value = 0;
+    int extra = length % 4;
+    int i = 0;
+    
+    for (i = 0; i < (length - extra); i += 4) {
+	value = data[i];
+	value |= data[i+1] << 8;
+	value |= data[i+2] << 16;
+	value |= data[i+3] << 24;
+
+	sum ^= value;
+    }
+
+    if (extra > 0) {
+	value = (extra >= 1? data[i] : 0);
+	value |= (extra >= 2? data[i+1] : 0) << 8;
+	value |= (extra >= 3? data[i+2] : 0) << 16;
+	sum ^= value;
+    }
+
+    return sum;
+}
+
 int senddata(SOCKET socket, void* data, uint16_t length)
 {
     int rc = 0;
-    uint16_t net_length = htons(length);
+    struct msg_header m;
 
     if (length <= 0) {
         set_error(EINVAL);
         return -1;
     }
 
-    rc = send(socket, &net_length, sizeof(uint16_t), 0);
+    m.length = htons(length);
+    m.sum = htonl(chksum(data, length));
+
+    rc = send(socket, &m, sizeof(struct msg_header), 0);
     if (rc == 0) {
         set_error(ECANCELED);
         return -1;
@@ -506,16 +540,17 @@ int senddata(SOCKET socket, void* data, uint16_t length)
 int recvdata(SOCKET socket, void* data, uint16_t* length)
 {
     int rc = 0;
-    int recv_length = sizeof(uint16_t);
-    uint16_t msg_length;
-    uint16_t buffer;
+    int recv_length = sizeof(struct msg_header);
+    int recv_sum = 0;
+    struct msg_header m;
+    struct msg_header b;
 
 
     /* PEEK at the message length 
     * necessary to verify that buffer is large enough
     * and still allow receive of message after check
     */
-    rc = recv(socket, &msg_length, recv_length, MSG_PEEK);
+    rc = recv(socket, &m, recv_length, MSG_PEEK);
     if (rc == 0) {
         set_error(ECANCELED);
         return -1;
@@ -526,20 +561,21 @@ int recvdata(SOCKET socket, void* data, uint16_t* length)
         return -1;
     }
 
-    msg_length = ntohs(msg_length);
-    if (msg_length > *length) {
+    m.length = ntohs(m.length);
+    m.sum = ntohl(m.sum);
+    if (m.length > *length) {
         set_error(ENOMEM);
         return -1;
     }
-
+    
     /* remove the header from the socket stream
     * necessary because we peeked at the message
     * length before hand.
     * NOTE: this header will not be removed
     * if the buffer was not long enough
     */
-    recv_length = sizeof(uint16_t);
-    rc = recv(socket, &buffer, recv_length, 0);
+    recv_length = sizeof(struct msg_header);
+    rc = recv(socket, &b, recv_length, 0);
     if (rc == 0) {
         set_error(ECANCELED);
         return -1;
@@ -547,7 +583,7 @@ int recvdata(SOCKET socket, void* data, uint16_t* length)
         return -1;
     }
 
-    dbg(DBG_VERB, "recvdata: recv length %u\n", msg_length);
+    dbg(DBG_VERB, "recvdata: recv length %u\n", m.length);
 
     /* receive the raw data
     * now we actually retrieve the data
@@ -555,18 +591,24 @@ int recvdata(SOCKET socket, void* data, uint16_t* length)
     * the same amount as specified
     * in the msg_length
     */
-    rc = recv(socket, data, msg_length, 0);
+    rc = recv(socket, data, m.length, 0);
     if (rc == 0) {
         set_error(ECANCELED);
         return -1;
     } else if (rc < 0) {
         return -1;
-    } else if (rc != msg_length) {
+    } else if (rc != m.length) {
         set_error(ECANCELED);
         return -1;
     }
 
+    recv_sum = chksum(data, m.length);
+    if(m.sum ^ recv_sum) {
+	dbg(DBG_WARN, "chksum expected %u\n", m.sum);
+	dbg(DBG_WARN, "chksum computed %u\n", recv_sum);
+    }
+
     /* set the length to the actual received length */
-    *length = msg_length;
+    *length = m.length;
     return 0;
 }

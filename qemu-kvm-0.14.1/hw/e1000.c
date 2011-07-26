@@ -432,18 +432,18 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 		qemu_free(buffer);
 	}
 
-	fprintf(e1000_log, "%s: recv_desc\n", __func__);
-	fprintf(e1000_log, "%s: flags=%u\n", __func__, recv_desc.flags);
-	fprintf(e1000_log, "%s: opcode=%u\n", __func__, recv_desc.opcode);
-	fprintf(e1000_log, "%s: datalen=%u\n", __func__, recv_desc.datalen);
-	fprintf(e1000_log, "%s: cookie_high=%u\n", __func__, recv_desc.cookie_high);
-	fprintf(e1000_log, "%s: cookie_low=%u\n", __func__, recv_desc.cookie_low);
-	fprintf(e1000_log, "%s: param0=%u\n", __func__, recv_desc.param0);
-	fprintf(e1000_log, "%s: param1=%u\n", __func__, recv_desc.param1);
-	fprintf(e1000_log, "%s: addr_high=%u\n", __func__, recv_desc.addr_high);
-	fprintf(e1000_log, "%s: addr_low=%u\n", __func__, recv_desc.addr_low);
-	fprintf(e1000_log, "%s: message_length=%u\n", __func__, recv_size);
-	fprintf(e1000_log, "%s: expected size=%lu\n", __func__, sizeof(recv_desc));
+	fdbg(e1000_log, DBG_VERB, "%s: recv_desc\n", __func__);
+	fdbg(e1000_log, DBG_VERB, "%s: flags=%u\n", __func__, recv_desc.flags);
+	fdbg(e1000_log, DBG_VERB, "%s: opcode=%u\n", __func__, recv_desc.opcode);
+	fdbg(e1000_log, DBG_VERB, "%s: datalen=%u\n", __func__, recv_desc.datalen);
+	fdbg(e1000_log, DBG_VERB, "%s: cookie_high=%u\n", __func__, recv_desc.cookie_high);
+	fdbg(e1000_log, DBG_VERB, "%s: cookie_low=%u\n", __func__, recv_desc.cookie_low);
+	fdbg(e1000_log, DBG_VERB, "%s: param0=%u\n", __func__, recv_desc.param0);
+	fdbg(e1000_log, DBG_VERB, "%s: param1=%u\n", __func__, recv_desc.param1);
+	fdbg(e1000_log, DBG_VERB, "%s: addr_high=%u\n", __func__, recv_desc.addr_high);
+	fdbg(e1000_log, DBG_VERB, "%s: addr_low=%u\n", __func__, recv_desc.addr_low);
+	fdbg(e1000_log, DBG_VERB, "%s: message_length=%u\n", __func__, recv_size);
+	fdbg(e1000_log, DBG_VERB, "%s: expected size=%lu\n", __func__, sizeof(recv_desc));
 	
 	/* Got a valid descriptor back */
 	memcpy(desc, &recv_desc, sizeof(recv_desc));

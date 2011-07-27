@@ -54,27 +54,26 @@
 #define E1000_PF_ATQT_ATQT_SHIFT        0
 #define E1000_PF_ATQT_ATQT_MASK         (0x3FF << E1000_PF_ATQT_ATQT_SHIFT)
 
-
 enum e1000_admin_queue_cmd {
-        e1000_aqc_get_version           = 0x0001,
-        e1000_aqc_driver_heartbeat      = 0x0002,
-        e1000_aqc_echo                  = 0x0003,
+    e1000_aqc_get_version = 0x0001,
+    e1000_aqc_driver_heartbeat = 0x0002,
+    e1000_aqc_echo = 0x0003,
 };
 
 /*
  * Basic adminq descriptor
  */
 struct e1000_aq_desc {
-        uint16_t flags;
-        uint16_t opcode;
-        uint16_t datalen;
-        uint16_t retval;
-        uint32_t cookie_high;
-        uint32_t cookie_low;
-        uint32_t param0;
-        uint32_t param1;
-        uint32_t addr_high;
-        uint32_t addr_low;
+    uint16_t flags;
+    uint16_t opcode;
+    uint16_t datalen;
+    uint16_t retval;
+    uint32_t cookie_high;
+    uint32_t cookie_low;
+    uint32_t param0;
+    uint32_t param1;
+    uint32_t addr_high;
+    uint32_t addr_low;
 };
 
 /* command flags and offsets */
@@ -103,9 +102,8 @@ struct e1000_aq_desc {
 #define E1000_AQ_FLAG_FE                (1 << E1000_AQ_FLAG_FE_OFF_SHIFT)
 
 enum e1000_admin_queue_err {
-        E1000_AQ_RC_OK          = 0,
-        E1000_AQ_RC_ENOSYS      = 1,
+    E1000_AQ_RC_OK = 0,
+    E1000_AQ_RC_ENOSYS = 1,
 };
-
 
 #endif

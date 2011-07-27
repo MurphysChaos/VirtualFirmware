@@ -20,7 +20,7 @@
 #define DBG_WARN   3
 #define DBG_VERB   4
 
-void fdbg(FILE *f, int level, const char *msg, ...);
+void fdbg(FILE * f, int level, const char *msg, ...);
 void dbg(int level, const char *msg, ...);
 
 #endif

@@ -72,7 +72,7 @@ SOCKET locate(const char *optrc);
  * across the socket, by first sending the length in a fixed value
  * "header", then sending the buffer.
  */
-int senddata(SOCKET socket, void* data, uint16_t length);
+int senddata(SOCKET socket, void *data, uint16_t length);
 
 /*
  * recvdata()
@@ -85,4 +85,4 @@ int senddata(SOCKET socket, void* data, uint16_t length);
  * it will modify the length value to be the actual
  * length of the message returned.
  */
-int recvdata(SOCKET socket, void* data, uint16_t* length);
+int recvdata(SOCKET socket, void *data, uint16_t * length);

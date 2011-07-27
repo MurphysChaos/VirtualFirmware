@@ -23,7 +23,7 @@ struct announce_msg {
     uint32_t magic;
     uint32_t addr;
     uint16_t port;
-    uint16_t flags; // reserved
+    uint16_t flags;             // reserved
 };
 
 struct msg_header {
@@ -44,11 +44,12 @@ typedef struct if_data {
     struct sockaddr sa;
 } IF_DATA;
 
-int buildIfPanel(IF_PANEL *p, IF_DATA *i);
-int populateInterfaceData(IF_DATA *if_d, int *numIfs);
-uint32_t chksum(uint8_t *data, uint16_t length);
+int buildIfPanel(IF_PANEL * p, IF_DATA * i);
+int populateInterfaceData(IF_DATA * if_d, int *numIfs);
+uint32_t chksum(uint8_t * data, uint16_t length);
 
-int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
+int buildIfPanel(IF_PANEL * p, IF_DATA * i)
+{
     int rc = 0;
 
     dbg(DBG_WARN, "Using interface '%s' (%s)\n", i->if_addr, i->if_name);
@@ -96,7 +97,8 @@ int buildIfPanel(IF_PANEL *p, IF_DATA *i) {
     return 0;
 }
 
-int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
+int populateInterfaceData(IF_DATA * if_d, int *numIfs)
+{
 #ifdef _WIN32
     SOCKET s;
     int numFoundIfs = 0, i, rc = 0, pc = 0;
@@ -111,14 +113,10 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
     }
 
     rc = WSAIoctl(s,
-        SIO_GET_INTERFACE_LIST,
-        0,
-        0,
-        &interfaces,
-        sizeof(INTERFACE_INFO) * 32,
-        &nReturned,
-        0,
-        0);
+                  SIO_GET_INTERFACE_LIST,
+                  0,
+                  0,
+                  &interfaces, sizeof(INTERFACE_INFO) * 32, &nReturned, 0, 0);
 
     if (rc == SOCKET_ERROR) {
         dbg(DBG_ERROR, "SIO_GET_INTERFACE_LIST: '%s'\n", sock_error());
@@ -132,38 +130,33 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
     for (i = 0; i < nReturned; i++) {
         INTERFACE_INFO *pIf = &interfaces[i];
         if ((pIf->iiFlags & IFF_UP) &&
-            (pIf->iiFlags & IFF_MULTICAST) &&
-            !(pIf->iiFlags & IFF_LOOPBACK)) {
+            (pIf->iiFlags & IFF_MULTICAST) && !(pIf->iiFlags & IFF_LOOPBACK)) {
 
-                /* We check to make sure we can hold the interface */
-                if ((numFoundIfs + 1) > *numIfs) {
-                    numFoundIfs++;
-                    continue;
-                }
-
-                /* We found a useful interface */
-                rc = getnameinfo(&(pIf->iiAddress.Address),
-                    sizeof(struct sockaddr_in),
-                    if_d[numFoundIfs].if_addr,
-                    NI_MAXHOST,
-                    0,
-                    0,
-                    NI_NUMERICHOST);
-                if (rc != 0) {
-                    rc = SOCKET_ERROR;
-                    return rc;
-                }
-
-                /* Name the adapter */
-                sprintf(if_d[numFoundIfs].if_name,
-                    "ifwin%d",
-                    i);
-
-                /* Copy the struct sockaddr */
-                memcpy(&if_d[numFoundIfs].sa, &pIf->iiAddress.Address, sizeof(struct sockaddr));
-
-                /* Increment the total number of adapters */
+            /* We check to make sure we can hold the interface */
+            if ((numFoundIfs + 1) > *numIfs) {
                 numFoundIfs++;
+                continue;
+            }
+
+            /* We found a useful interface */
+            rc = getnameinfo(&(pIf->iiAddress.Address),
+                             sizeof(struct sockaddr_in),
+                             if_d[numFoundIfs].if_addr,
+                             NI_MAXHOST, 0, 0, NI_NUMERICHOST);
+            if (rc != 0) {
+                rc = SOCKET_ERROR;
+                return rc;
+            }
+
+            /* Name the adapter */
+            sprintf(if_d[numFoundIfs].if_name, "ifwin%d", i);
+
+            /* Copy the struct sockaddr */
+            memcpy(&if_d[numFoundIfs].sa, &pIf->iiAddress.Address,
+                   sizeof(struct sockaddr));
+
+            /* Increment the total number of adapters */
+            numFoundIfs++;
         }
     }
 
@@ -177,7 +170,7 @@ int populateInterfaceData(IF_DATA *if_d, int *numIfs) {
     *numIfs = numFoundIfs;
     return rc;
 
-err:
+ err:
     return rc;
 #else
     struct ifaddrs *ifaddrs = NULL;
@@ -202,31 +195,29 @@ err:
         if ((ifa->ifa_flags & IFF_UP) &&
             (ifa->ifa_flags & IFF_MULTICAST) &&
             !(ifa->ifa_flags & IFF_LOOPBACK)) {
-                /* If we get here, then we want to use this interface
-                * NOTE: first check that we have space. */
-                if ((numFoundIfs + 1) > *numIfs) {
-                    numFoundIfs++;
-                    continue;
-                }
-
-                rc = getnameinfo(ifa->ifa_addr,
-                    sizeof(struct sockaddr_in),
-                    if_d[numFoundIfs].if_addr,
-                    NI_MAXHOST,
-                    0,
-                    0,
-                    NI_NUMERICHOST);
-                if (rc != 0) {
-                    rc = SOCKET_ERROR;
-                    return rc;
-                }
-
-                /* Copy relevant data into the IF_DATA buffer */
-                strncpy(if_d[numFoundIfs].if_name, ifa->ifa_name, NI_MAXHOST);
-                memcpy(&if_d[numFoundIfs].sa, ifa->ifa_addr, sizeof(struct sockaddr));
-
-                /* Increment the total number of interfaces */
+            /* If we get here, then we want to use this interface
+             * NOTE: first check that we have space. */
+            if ((numFoundIfs + 1) > *numIfs) {
                 numFoundIfs++;
+                continue;
+            }
+
+            rc = getnameinfo(ifa->ifa_addr,
+                             sizeof(struct sockaddr_in),
+                             if_d[numFoundIfs].if_addr,
+                             NI_MAXHOST, 0, 0, NI_NUMERICHOST);
+            if (rc != 0) {
+                rc = SOCKET_ERROR;
+                return rc;
+            }
+
+            /* Copy relevant data into the IF_DATA buffer */
+            strncpy(if_d[numFoundIfs].if_name, ifa->ifa_name, NI_MAXHOST);
+            memcpy(&if_d[numFoundIfs].sa, ifa->ifa_addr,
+                   sizeof(struct sockaddr));
+
+            /* Increment the total number of interfaces */
+            numFoundIfs++;
         }
     }
 
@@ -244,7 +235,8 @@ err:
 }
 
 #define MAX_IF_LENGTH 32
-SOCKET announce(const char *optrc) {
+SOCKET announce(const char *optrc)
+{
     IF_PANEL ifp[MAX_IF_LENGTH];
     IF_DATA ifd[MAX_IF_LENGTH];
     int ifd_length = MAX_IF_LENGTH;
@@ -294,21 +286,24 @@ SOCKET announce(const char *optrc) {
 
     /* the funny condition causes us to loop forever
        if we have a timeout of 0 */
-    for(count = 0; (num_packets == 0 || count < num_packets); count++) {
+    for (count = 0; (num_packets == 0 || count < num_packets); count++) {
         m.magic = htonl(OPT.magicnum);
         m.port = htons(atoi(OPT.tcpport));
         m.flags = 0;
 
         for (i = 0; i < ifd_length; i++) {
-            m.addr = ((struct sockaddr_in *) &(ifp[i].cs->sp_bind))->sin_addr.s_addr;
-            rc = sendto(ifp[i].hs->sp_socket, (const char *) &m, sizeof(m), 0, &(ifp[i].hs->sp_dest), sizeof(ifp[i].hs->sp_dest));
+            m.addr =
+                ((struct sockaddr_in *)&(ifp[i].cs->sp_bind))->sin_addr.s_addr;
+            rc = sendto(ifp[i].hs->sp_socket, (const char *)&m, sizeof(m), 0,
+                        &(ifp[i].hs->sp_dest), sizeof(ifp[i].hs->sp_dest));
             if (rc == SOCKET_ERROR) {
                 dbg(DBG_ERROR, "sendto(hs): %s\n", sock_error());
                 goto err;
             }
         }
 
-        dbg(DBG_WARN, "Sent announce msg %d to %s\n", count, FormatAddr(&(ifp[0].hs->sp_dest), addr, NI_MAXHOST));
+        dbg(DBG_WARN, "Sent announce msg %d to %s\n", count,
+            FormatAddr(&(ifp[0].hs->sp_dest), addr, NI_MAXHOST));
 
         FD_ZERO(&readfds);
 
@@ -331,9 +326,12 @@ SOCKET announce(const char *optrc) {
             for (i = 0; i < ifd_length; i++) {
                 if (FD_ISSET(ifp[i].cs->sp_socket, &readfds)) {
                     acceptlen = sizeof(struct sockaddr);
-                    socket = accept(ifp[i].cs->sp_socket, &(ifp[i].cs->sp_dest), &acceptlen);
+                    socket =
+                        accept(ifp[i].cs->sp_socket, &(ifp[i].cs->sp_dest),
+                               &acceptlen);
                     accepted = i;
-                    dbg(DBG_STATUS, "connected to %s\n", FormatAddr(&(ifp[i].cs->sp_dest), addr, NI_MAXHOST));
+                    dbg(DBG_STATUS, "connected to %s\n",
+                        FormatAddr(&(ifp[i].cs->sp_dest), addr, NI_MAXHOST));
                     break;
                 }
             }
@@ -356,11 +354,11 @@ SOCKET announce(const char *optrc) {
             goto err;
         }
         FreePanel(ifp[i].hs);
-    } 
+    }
 
     return socket;
 
-err:
+ err:
     for (i = 0; i < ifd_length || i < MAX_IF_LENGTH; i++) {
         FreePanel(ifp[i].hs);
         FreePanel(ifp[i].cs);
@@ -369,9 +367,10 @@ err:
     return INVALID_SOCKET;
 }
 
-SOCKET locate(const char *optrc) {
-    PANEL* hs = NULL;
-    PANEL* cs = NULL;
+SOCKET locate(const char *optrc)
+{
+    PANEL *hs = NULL;
+    PANEL *cs = NULL;
 
     IF_DATA ifd[MAX_IF_LENGTH];
     int ifd_length = MAX_IF_LENGTH;
@@ -398,19 +397,19 @@ SOCKET locate(const char *optrc) {
     }
 
     hs = CreatePanel(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if(!hs) {
+    if (!hs) {
         dbg(DBG_ERROR, "CreateBoundPanel(hs): %s\n", sock_error());
         goto err;
     }
 
     rc = BindPanel(hs, NULL, OPT.mcastport, 1);
-    if(rc == SOCKET_ERROR) {
+    if (rc == SOCKET_ERROR) {
         dbg(DBG_ERROR, "BindPanel(hs), '%s'\n", sock_error());
         goto err;
     }
 
     rc = SetDestination(hs, OPT.mcastip, OPT.mcastport);
-    if(rc == SOCKET_ERROR) {
+    if (rc == SOCKET_ERROR) {
         dbg(DBG_ERROR, "SetDestination(hs): %s\n", sock_error());
         goto err;
     }
@@ -430,7 +429,7 @@ SOCKET locate(const char *optrc) {
     }
 
     cs = CreateBoundPanel("0", AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(!cs) {
+    if (!cs) {
         dbg(DBG_ERROR, "CreateBoundPanel(cs): %s\n", sock_error());
         goto err;
     }
@@ -438,11 +437,12 @@ SOCKET locate(const char *optrc) {
     tv.tv_sec = OPT.timeout;
     tv.tv_usec = 0;
 
-    while(socket == INVALID_SOCKET) {
+    while (socket == INVALID_SOCKET) {
         FD_ZERO(&readfds);
         FD_SET(hs->sp_socket, &readfds);
 
-        rc = select(hs->sp_socket + 1, &readfds, NULL, NULL, (OPT.timeout > 0 ? &tv : NULL));
+        rc = select(hs->sp_socket + 1, &readfds, NULL, NULL,
+                    (OPT.timeout > 0 ? &tv : NULL));
         if (rc < 0) {
             dbg(DBG_ERROR, "select(hs): %s\n", sock_error());
             goto err;
@@ -454,7 +454,8 @@ SOCKET locate(const char *optrc) {
         /* if we get here, select woke up with a valid packet */
 
         recvlen = sizeof(struct sockaddr);
-        rc = recvfrom(hs->sp_socket, &m, sizeof(m), 0, &(cs->sp_dest), &recvlen);
+        rc = recvfrom(hs->sp_socket, &m, sizeof(m), 0, &(cs->sp_dest),
+                      &recvlen);
         if (rc == SOCKET_ERROR) {
             dbg(DBG_ERROR, "recvfrom(hs): %s\n", sock_error());
             goto err;
@@ -463,18 +464,19 @@ SOCKET locate(const char *optrc) {
         m.magic = ntohl(m.magic);
 
         dbg(DBG_WARN, "received announce (magic=%d) from %s\n",
-            m.magic, FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST)); 
+            m.magic, FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST));
 
         if (m.magic == OPT.magicnum) {
-            ((struct sockaddr_in *) &(cs->sp_dest))->sin_addr.s_addr = m.addr;
-            ((struct sockaddr_in *) &(cs->sp_dest))->sin_port = m.port;
-            rc = connect(cs->sp_socket, &(cs->sp_dest), sizeof(struct sockaddr));
+            ((struct sockaddr_in *)&(cs->sp_dest))->sin_addr.s_addr = m.addr;
+            ((struct sockaddr_in *)&(cs->sp_dest))->sin_port = m.port;
+            rc = connect(cs->sp_socket, &(cs->sp_dest),
+                         sizeof(struct sockaddr));
             if (rc == SOCKET_ERROR) {
                 dbg(DBG_ERROR, "connect(cs): %s\n", sock_error());
                 goto err;
-            }
-            else {
-                dbg(DBG_STATUS, "connected to %s\n", FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST));
+            } else {
+                dbg(DBG_STATUS, "connected to %s\n",
+                    FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST));
                 socket = cs->sp_socket;
             }
         }
@@ -485,7 +487,7 @@ SOCKET locate(const char *optrc) {
 
     return socket;
 
-err:
+ err:
     if (hs) {
         FreePanel(hs);
     }
@@ -497,32 +499,33 @@ err:
     return INVALID_SOCKET;
 }
 
-uint32_t chksum(uint8_t *data, uint16_t length) {
+uint32_t chksum(uint8_t * data, uint16_t length)
+{
     uint32_t sum = 0;
     uint32_t value = 0;
     int extra = length % 4;
     int i = 0;
-    
-    for (i = 0; i < (length - extra); i += 4) {
-	value = data[i];
-	value |= data[i+1] << 8;
-	value |= data[i+2] << 16;
-	value |= data[i+3] << 24;
 
-	sum ^= value;
+    for (i = 0; i < (length - extra); i += 4) {
+        value = data[i];
+        value |= data[i + 1] << 8;
+        value |= data[i + 2] << 16;
+        value |= data[i + 3] << 24;
+
+        sum ^= value;
     }
 
     if (extra > 0) {
-	value = (extra >= 1? data[i] : 0);
-	value |= (extra >= 2? data[i+1] : 0) << 8;
-	value |= (extra >= 3? data[i+2] : 0) << 16;
-	sum ^= value;
+        value = (extra >= 1 ? data[i] : 0);
+        value |= (extra >= 2 ? data[i + 1] : 0) << 8;
+        value |= (extra >= 3 ? data[i + 2] : 0) << 16;
+        sum ^= value;
     }
 
     return sum;
 }
 
-int senddata(SOCKET socket, void* data, uint16_t length)
+int senddata(SOCKET socket, void *data, uint16_t length)
 {
     int rc = 0;
     struct msg_header m;
@@ -556,7 +559,7 @@ int senddata(SOCKET socket, void* data, uint16_t length)
     return rc;
 }
 
-int recvdata(SOCKET socket, void* data, uint16_t* length)
+int recvdata(SOCKET socket, void *data, uint16_t * length)
 {
     int rc = 0;
     int recv_length = sizeof(struct msg_header);
@@ -564,11 +567,10 @@ int recvdata(SOCKET socket, void* data, uint16_t* length)
     struct msg_header m;
     struct msg_header b;
 
-
     /* PEEK at the message length 
-    * necessary to verify that buffer is large enough
-    * and still allow receive of message after check
-    */
+     * necessary to verify that buffer is large enough
+     * and still allow receive of message after check
+     */
     rc = recv(socket, &m, recv_length, MSG_PEEK);
     if (rc == 0) {
         set_error(ECANCELED);
@@ -586,13 +588,13 @@ int recvdata(SOCKET socket, void* data, uint16_t* length)
         set_error(ENOMEM);
         return -1;
     }
-    
+
     /* remove the header from the socket stream
-    * necessary because we peeked at the message
-    * length before hand.
-    * NOTE: this header will not be removed
-    * if the buffer was not long enough
-    */
+     * necessary because we peeked at the message
+     * length before hand.
+     * NOTE: this header will not be removed
+     * if the buffer was not long enough
+     */
     recv_length = sizeof(struct msg_header);
     rc = recv(socket, &b, recv_length, 0);
     if (rc == 0) {
@@ -605,11 +607,11 @@ int recvdata(SOCKET socket, void* data, uint16_t* length)
     dbg(DBG_VERB, "recvdata: recv length %u\n", m.length);
 
     /* receive the raw data
-    * now we actually retrieve the data
-    * and error out if we don't receive
-    * the same amount as specified
-    * in the msg_length
-    */
+     * now we actually retrieve the data
+     * and error out if we don't receive
+     * the same amount as specified
+     * in the msg_length
+     */
     rc = recv(socket, data, m.length, 0);
     if (rc == 0) {
         set_error(ECANCELED);
@@ -622,9 +624,9 @@ int recvdata(SOCKET socket, void* data, uint16_t* length)
     }
 
     recv_sum = chksum(data, m.length);
-    if(m.sum ^ recv_sum) {
-	dbg(DBG_WARN, "chksum expected %u\n", m.sum);
-	dbg(DBG_WARN, "chksum computed %u\n", recv_sum);
+    if (m.sum ^ recv_sum) {
+        dbg(DBG_WARN, "chksum expected %u\n", m.sum);
+        dbg(DBG_WARN, "chksum computed %u\n", recv_sum);
     }
 
     /* set the length to the actual received length */

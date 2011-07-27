@@ -20,11 +20,10 @@ extern "C" {
 #include <string.h>
 #include "wsa_strerror.h"
 
-void set_error(int err);
-const char* sock_error(void);
+    void set_error(int err);
+    const char *sock_error(void);
 
 #ifdef _cplusplus
 }
 #endif
-
 #endif

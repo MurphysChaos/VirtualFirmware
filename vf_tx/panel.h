@@ -80,28 +80,29 @@ PANEL *CreateEmptyPanel(void);
 PANEL *CreatePanel(int af, int type, int proto);
 PANEL *CreateBoundPanel(const char *svc, int af, int type, int proto);
 PANEL *SocketToPanel(int s, struct sockaddr *addr);
-void FreePanel(PANEL *p);
-void DissociatePanel(PANEL *p);
+void FreePanel(PANEL * p);
+void DissociatePanel(PANEL * p);
 /* == UTILITY FUNCTIONS */
-struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af, int type, int proto);
+struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af,
+                             int type, int proto);
 /* == MANIPULATOR FUNCTIONS */
-int BindPanel(PANEL *p, const char *addr, const char *svc, int reuse);
-int SetDestination(PANEL *p, const char *addr, const char *svc);
-int SetOptionLinger(PANEL *p, uint16_t opt_yesno, uint16_t opt_delay);
-int SetOption(PANEL *p, int level, int option, int optval);
+int BindPanel(PANEL * p, const char *addr, const char *svc, int reuse);
+int SetDestination(PANEL * p, const char *addr, const char *svc);
+int SetOptionLinger(PANEL * p, uint16_t opt_yesno, uint16_t opt_delay);
+int SetOption(PANEL * p, int level, int option, int optval);
 /* -- Functions for multicasting */
-int JoinMulticastGroup(PANEL *p, const char *ifaddr);
-int LeaveMulticastGroup(PANEL *p, const char *ifaddr);
-int SetMulticastSendInterface(PANEL *p, struct sockaddr *addr);
-int SetMulticastTTL(PANEL *p, int ttl);
-int SetMulticastLoopback(PANEL *p, int loopval);
+int JoinMulticastGroup(PANEL * p, const char *ifaddr);
+int LeaveMulticastGroup(PANEL * p, const char *ifaddr);
+int SetMulticastSendInterface(PANEL * p, struct sockaddr *addr);
+int SetMulticastTTL(PANEL * p, int ttl);
+int SetMulticastLoopback(PANEL * p, int loopval);
 /* == Debugging functions */
 /* -- Fuctions for getting human-readable values on sockets. */
 char *FormatAddr(struct sockaddr *sa, char *buf, int buflen);
-void PrintPanel(FILE *f, PANEL *p);
-void PrintAddrFamily(FILE *f, int af);
-void PrintAddrProtocol(FILE *f, int proto);
-void PrintAddrinfo(FILE *f, struct addrinfo *ai);
-void PrintAddr(FILE *f, struct sockaddr *sa);
+void PrintPanel(FILE * f, PANEL * p);
+void PrintAddrFamily(FILE * f, int af);
+void PrintAddrProtocol(FILE * f, int proto);
+void PrintAddrinfo(FILE * f, struct addrinfo *ai);
+void PrintAddr(FILE * f, struct sockaddr *sa);
 
 #endif

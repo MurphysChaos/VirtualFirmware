@@ -34,17 +34,17 @@
 #define MULTICAST_PORT "9751"
 #define MAGIC_NUMBER 0xe1000
 #define TCP_PORT "9752"
-#define CONNECT_TIMEOUT 0 //10
-#define DBGLVL 3 //0
+#define CONNECT_TIMEOUT 0       //10
+#define DBGLVL 3                //0
 
 /*
  * A structure for handling options.
  */
 
 struct options {
-    char mcastip[16];  // IP only, URL not allowed
+    char mcastip[16];           // IP only, URL not allowed
     char mcastport[6];
-    uint32_t magicnum; // Magic number for broadcast packets
+    uint32_t magicnum;          // Magic number for broadcast packets
     char tcpport[6];
     int timeout;
     int dbglvl;

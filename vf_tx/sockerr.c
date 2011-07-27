@@ -11,19 +11,21 @@
 
 #include "sockerr.h"
 
-void set_error(int err) {
+void set_error(int err)
+{
 #ifdef _WIN32
-	WSASetLastError(err);
+    WSASetLastError(err);
 #else
-	errno = err;
+    errno = err;
 #endif
 }
 
-const char* sock_error(void) {
-  int errval = errno;
+const char *sock_error(void)
+{
+    int errval = errno;
 #ifdef _WIN32
-  return wsa_strerror(WSAGetLastError());
+    return wsa_strerror(WSAGetLastError());
 #else
-  return strerror(errval);
+    return strerror(errval);
 #endif
 }

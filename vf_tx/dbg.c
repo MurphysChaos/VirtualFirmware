@@ -12,7 +12,8 @@
 #include "dbg.h"
 #include "opt.h"
 
-void fdbg(FILE *f, int level, const char *msg, ...) {
+void fdbg(FILE * f, int level, const char *msg, ...)
+{
     if (OPT.dbglvl >= level) {
         va_list args;
         va_start(args, msg);
@@ -21,7 +22,8 @@ void fdbg(FILE *f, int level, const char *msg, ...) {
     }
 }
 
-void dbg(int level, const char *msg, ...) {
+void dbg(int level, const char *msg, ...)
+{
     if (OPT.dbglvl >= level) {
         va_list args;
         va_start(args, msg);

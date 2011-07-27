@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{A27A4E65-306A-45AE-B401-80EE9E6E755C}</ProjectGuid>
+    <ProjectGuid>{E3C31FCD-6A4C-44F8-A29F-FF6C62D809D6}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>vf_tx</RootNamespace>
   </PropertyGroup>
@@ -54,7 +54,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\tx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>tx.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>libcmt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -76,17 +76,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="dbg.h" />
-    <ClInclude Include="e1000.h" />
-    <ClInclude Include="message.h" />
-    <ClInclude Include="opt.h" />
-    <ClInclude Include="panel.h" />
-    <ClInclude Include="sockerr.h" />
-    <ClInclude Include="tx_api.h" />
-    <ClInclude Include="tx_port.h" />
-    <ClInclude Include="wsa_strerror.h" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="dbg.c" />
     <ClCompile Include="message.c" />
     <ClCompile Include="opt.c" />
@@ -96,7 +85,15 @@
     <ClCompile Include="wsa_strerror.c" />
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\tx.lib" />
+    <ClInclude Include="dbg.h" />
+    <ClInclude Include="e1000.h" />
+    <ClInclude Include="message.h" />
+    <ClInclude Include="opt.h" />
+    <ClInclude Include="panel.h" />
+    <ClInclude Include="sockerr.h" />
+    <ClInclude Include="tx_api.h" />
+    <ClInclude Include="tx_port.h" />
+    <ClInclude Include="wsa_strerror.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -48,6 +48,7 @@ struct options {
     char tcpport[6];
     int timeout;
     int dbglvl;
+    int set;
 };
 
 extern struct options OPT;

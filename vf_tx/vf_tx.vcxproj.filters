@@ -15,6 +15,29 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="dbg.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="message.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="opt.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="panel.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sockerr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vf_tx.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="wsa_strerror.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="dbg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -42,33 +65,5 @@
     <ClInclude Include="wsa_strerror.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="dbg.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="message.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="opt.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="panel.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="sockerr.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vf_tx.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="wsa_strerror.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="..\tx.lib">
-      <Filter>Resource Files</Filter>
-    </Library>
   </ItemGroup>
 </Project>

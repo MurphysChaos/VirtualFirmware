@@ -16,6 +16,8 @@
 	headers and libraries are the property of ExpressLogic.
 */
 
+#include <time.h>
+
 #include "message.h"
 #include "e1000.h"
 #include "tx_api.h"

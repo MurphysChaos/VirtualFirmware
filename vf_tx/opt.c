@@ -21,7 +21,7 @@
 #include "opt.h"
 
 const char *default_file = OPTRC;
-struct options OPT;
+struct options OPT = { MULTICAST_ADDR, MULTICAST_PORT, MAGIC_NUMBER, TCP_PORT, CONNECT_TIMEOUT, DBGLVL, 0 };
 
 void ReadOptions(const char *filename)
 {
@@ -31,16 +31,15 @@ void ReadOptions(const char *filename)
 
     int rc = 0;
 
+    if (OPT.set) {
+        return;
+    }
+
     if (filename == NULL) {
         filename = default_file;
     }
 
-    strcpy(OPT.mcastip, MULTICAST_ADDR);
-    strcpy(OPT.mcastport, MULTICAST_PORT);
-    strcpy(OPT.tcpport, TCP_PORT);
-    OPT.magicnum = MAGIC_NUMBER;
-    OPT.timeout = CONNECT_TIMEOUT;
-    OPT.dbglvl = DBGLVL;
+    OPT.set = 1;
 
     f = fopen(filename, "r");
     if (f) {

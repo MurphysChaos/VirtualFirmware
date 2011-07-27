@@ -1,3 +1,22 @@
+/*
+    message -- Messaging API
+    
+    Implements a method of connecting two interfaces using a brute force 
+    multicast announce on all valid sockets and then sending messages of 
+    variable length between the two interfaces.
+
+    The brute force connection method means the two machines don't have to 
+    know each others IP addresses ahead of time. The limitation is they must 
+    be within the same subnet.
+*/
+
+/*
+    Copyright (C) 2011 Jacob Keller, All rights reserved
+
+    The code in this file is licensed under GPL v2. This license does not 
+    extend to any file bundled with this one.
+*/
+
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #pragma comment(lib, "Ws2_32.lib")

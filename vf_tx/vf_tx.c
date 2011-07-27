@@ -9,7 +9,7 @@
 /*
 	Copyright (C) 2011 Joel Murphy, All rights reserved
 
-	The code in this code file is licensed under GPLv2. This license does not 
+	The code in this file is licensed under GPLv2. This license does not 
 	extend to any other files bundlded with this file.
 	
 	ThreadX and ThreadX RTOS are trademarks of ExpressLogic and all ThreadX 
@@ -19,8 +19,8 @@
 #include "message.h"
 #include "e1000.h"
 #include "tx_api.h"
+#include "dbg.h"
 
-#pragma comment (lib, "tx.lib")
 #define OPTRC_FILE "vf.optrc"
 
 #define FW_MSG_SIZE         sizeof (struct e1000_aq_desc)   /* Size of a firmware message, in bytes. */

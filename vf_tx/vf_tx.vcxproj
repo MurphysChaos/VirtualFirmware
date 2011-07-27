@@ -10,30 +10,8 @@
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="dbg.h" />
-    <ClInclude Include="e1000.h" />
-    <ClInclude Include="message.h" />
-    <ClInclude Include="opt.h" />
-    <ClInclude Include="panel.h" />
-    <ClInclude Include="tx_api.h" />
-    <ClInclude Include="tx_port.h" />
-    <ClInclude Include="wsa_strerror.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="dbg.c" />
-    <ClCompile Include="message.c" />
-    <ClCompile Include="opt.c" />
-    <ClCompile Include="panel.c" />
-    <ClCompile Include="sockerr.c" />
-    <ClCompile Include="vf_tx.c" />
-    <ClCompile Include="wsa_strerror.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="tx.lib" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{D5A807C7-A5AC-453B-8345-3CFCD748E902}</ProjectGuid>
+    <ProjectGuid>{A27A4E65-306A-45AE-B401-80EE9E6E755C}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>vf_tx</RootNamespace>
   </PropertyGroup>
@@ -72,14 +50,11 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <CompileAs>CompileAsC</CompileAs>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <IgnoreAllDefaultLibraries>
-      </IgnoreAllDefaultLibraries>
+      <AdditionalDependencies>..\tx.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>libcmt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -100,6 +75,29 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="dbg.h" />
+    <ClInclude Include="e1000.h" />
+    <ClInclude Include="message.h" />
+    <ClInclude Include="opt.h" />
+    <ClInclude Include="panel.h" />
+    <ClInclude Include="sockerr.h" />
+    <ClInclude Include="tx_api.h" />
+    <ClInclude Include="tx_port.h" />
+    <ClInclude Include="wsa_strerror.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dbg.c" />
+    <ClCompile Include="message.c" />
+    <ClCompile Include="opt.c" />
+    <ClCompile Include="panel.c" />
+    <ClCompile Include="sockerr.c" />
+    <ClCompile Include="vf_tx.c" />
+    <ClCompile Include="wsa_strerror.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\tx.lib" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

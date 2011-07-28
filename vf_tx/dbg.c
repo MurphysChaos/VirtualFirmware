@@ -16,10 +16,12 @@ void fdbg(FILE * f, int level, const char *msg, ...)
     if (OPT.dbglvl >= level) {
         va_list args;
 	time_t t;
-	
+	char str_t[36];
+
 	/* Print the time stamp */
 	time(&t);
-	fprintf(f, "%s\b: ", ctime(&t)); 
+	strftime(str_t, 35, "%c", localtime(&t));
+	fprintf(f, "%s: ", str_t); 
 
 	/* Print the rest of the message */
         va_start(args, msg);

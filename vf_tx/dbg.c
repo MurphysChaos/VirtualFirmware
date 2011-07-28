@@ -19,7 +19,7 @@ void fdbg(FILE * f, int level, const char *msg, ...)
 	
 	/* Print the time stamp */
 	time(&t);
-	fprintf(f, "%s:", ctime(&t)); 
+	fprintf(f, "%s\b: ", ctime(&t)); 
 
 	/* Print the rest of the message */
         va_start(args, msg);

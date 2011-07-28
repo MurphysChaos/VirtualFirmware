@@ -314,7 +314,7 @@ flash_eerd_read(E1000State *s, int x)
 
 static void e1000_aq_get_version(struct e1000_aq_desc *desc)
 {
-	fprintf(e1000_log, "in aq_get_version!\n");
+	fdbg(e1000_log, DBG_STATUS, "in aq_get_version!\n");
 #define FW_MAJ_TEMP 0x34
 #define FW_MIN_TEMP 0x13
 #define API_MAJ_TEMP 0xfa
@@ -330,7 +330,7 @@ static void e1000_aq_echo(struct e1000_aq_desc *desc)
 	target_phys_addr_t in_buf;
 	uint8_t *my_buf;
 
-	fprintf(e1000_log, "%s\n", __func__);
+	fdbg(e1000_log, DBG_STATUS, "%s\n", __func__);
 
 	if (desc->datalen != 0) {
 		/* create my local buffer */
@@ -370,11 +370,11 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 
 	memset(&recv_desc, 0, sizeof(recv_desc));
 
-	fprintf(e1000_log, "%s: command 0x%02x\n", __func__, desc->opcode);
+	fdbg(e1000_log, DBG_STATUS, "%s: command 0x%02x\n", __func__, desc->opcode);
 
 	/* attempt to make connection */
 	if (s->fs == INVALID_SOCKET) {
-		s->fs = locate("/tmp/e1000.optrc");
+		s->fs = locate(NULL);
 		if (s->fs == INVALID_SOCKET) {
 			// Failure to make connection
 			goto err;
@@ -450,7 +450,7 @@ static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
 	return 0;
 
  err:
-	fprintf(e1000_log, "%s: command 0x%02x failed\n", __func__, desc->opcode);
+	fdbg(e1000_log, DBG_ERROR, "%s: command 0x%02x failed\n", __func__, desc->opcode);
 	close(s->fs);
 	s->fs = INVALID_SOCKET;
 	return -1;
@@ -472,7 +472,7 @@ static void e1000_set_atq_tail(E1000State *s, int index, uint32_t val)
 
 	cpu_physical_memory_read(base, (void *)&desc, sizeof(desc));
 
-	fprintf(e1000_log, "%s: command 0x%02x\n", __func__, desc.opcode);
+	fdbg(e1000_log, DBG_STATUS, "%s: command 0x%02x\n", __func__, desc.opcode);
 	/* attempt to send cmd to firmware
 	 * => fall back to process if failed */
 	if (e1000_send_aq_cmd(s, &desc) < 0) {
@@ -1281,7 +1281,7 @@ static int
 pci_e1000_uninit(PCIDevice *dev)
 {
     E1000State *d = DO_UPCAST(E1000State, dev, dev);
-    fprintf(e1000_log, "Logging ended.\n");
+    fdbg(e1000_log, DBG_STATUS, "Logging ended.\n");
     fclose(e1000_log);
 
     close(d->fs);
@@ -1322,10 +1322,11 @@ static int pci_e1000_init(PCIDevice *pci_dev)
 
     if (e1000_log == NULL) {
 	    e1000_log = fopen("/tmp/e1000_qemu.log", "a");
+	    ReadOptions("/tmp/e1000.optrc");
 	    setvbuf(e1000_log, NULL, _IONBF, 0);
-	    fprintf(e1000_log, "Logging started.\n");
+	    fdbg(e1000_log, DBG_STATUS, "Logging started.\n");
     } else {
-	    fprintf(e1000_log, "Logging re-started.\n");
+	    fdbg(e1000_log, DBG_STATUS, "Logging re-started.\n");
     }
 
     pci_conf = d->dev.config;

@@ -10,24 +10,23 @@
 */
 
 #include "dbg.h"
-#include "opt.h"
 
 void fdbg(FILE * f, int level, const char *msg, ...)
 {
     if (OPT.dbglvl >= level) {
         va_list args;
+	time_t t;
+	char str_t[36];
+
+	/* Print the time stamp */
+	time(&t);
+	strftime(str_t, 35, "%c", localtime(&t));
+	fprintf(f, "%s: ", str_t); 
+
+	/* Print the rest of the message */
         va_start(args, msg);
         vfprintf(f, msg, args);
         va_end(args);
     }
 }
 
-void dbg(int level, const char *msg, ...)
-{
-    if (OPT.dbglvl >= level) {
-        va_list args;
-        va_start(args, msg);
-        vfprintf(stderr, msg, args);
-        va_end(args);
-    }
-}

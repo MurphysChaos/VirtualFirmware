@@ -1,0 +1,2384 @@
+diff --git a/qemu-kvm-0.14.1/Makefile.objs b/qemu-kvm-0.14.1/Makefile.objs
+index a647c45..e4cfeb3 100644
+--- a/qemu-kvm-0.14.1/Makefile.objs
++++ b/qemu-kvm-0.14.1/Makefile.objs
+@@ -231,6 +231,11 @@ hw-obj-$(CONFIG_EEPRO100_PCI) += eepro100.o
+ hw-obj-$(CONFIG_PCNET_PCI) += pcnet-pci.o
+ hw-obj-$(CONFIG_PCNET_COMMON) += pcnet.o
+ hw-obj-$(CONFIG_E1000_PCI) += e1000.o
++hw-obj-$(CONFIG_E1000_PCI) += msg/message.o
++hw-obj-$(CONFIG_E1000_PCI) += msg/opt.o
++hw-obj-$(CONFIG_E1000_PCI) += msg/panel.o
++hw-obj-$(CONFIG_E1000_PCI) += msg/sockerr.o
++hw-obj-$(CONFIG_E1000_PCI) += msg/dbg.o
+ hw-obj-$(CONFIG_RTL8139_PCI) += rtl8139.o
+ 
+ hw-obj-$(CONFIG_SMC91C111) += smc91c111.o
+diff --git a/qemu-kvm-0.14.1/configure b/qemu-kvm-0.14.1/configure
+index 50f5de9..5f87426 100755
+--- a/qemu-kvm-0.14.1/configure
++++ b/qemu-kvm-0.14.1/configure
+@@ -3416,6 +3416,7 @@ for hwlib in 32 64; do
+   d=libhw$hwlib
+   mkdir -p $d
+   mkdir -p $d/ide
++  mkdir -p $d/msg
+   symlink $source_path/Makefile.hw $d/Makefile
+   echo "QEMU_CFLAGS+=-DTARGET_PHYS_ADDR_BITS=$hwlib" > $d/config.mak
+ done
+diff --git a/qemu-kvm-0.14.1/hw/e1000.c b/qemu-kvm-0.14.1/hw/e1000.c
+index af101bd..95411f2 100644
+--- a/qemu-kvm-0.14.1/hw/e1000.c
++++ b/qemu-kvm-0.14.1/hw/e1000.c
+@@ -24,7 +24,7 @@
+  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-
++#include <stdio.h>
+ #include "hw.h"
+ #include "pci.h"
+ #include "net.h"
+@@ -33,9 +33,12 @@
+ #include "sysemu.h"
+ 
+ #include "e1000_hw.h"
++#include "msg/message.h"
+ 
+ #define E1000_DEBUG
+ 
++FILE *e1000_log = NULL;
++
+ #ifdef E1000_DEBUG
+ enum {
+     DEBUG_GENERAL,	DEBUG_IO,	DEBUG_MMIO,	DEBUG_INTERRUPT,
+@@ -116,6 +119,8 @@ typedef struct E1000State_st {
+         char cptse;     // current packet tse bit
+     } tx;
+ 
++    SOCKET fs;
++
+     struct {
+         uint32_t val_in;	// shifted in from guest driver
+         uint16_t bitnum_in;
+@@ -137,7 +142,8 @@ enum {
+     defreg(TORH),	defreg(TORL),	defreg(TOTH),	defreg(TOTL),
+     defreg(TPR),	defreg(TPT),	defreg(TXDCTL),	defreg(WUFC),
+     defreg(RA),		defreg(MTA),	defreg(CRCERRS),defreg(VFTA),
+-    defreg(VET),
++    defreg(VET),	defreg(PF_ATQLEN), defreg(PF_ATQT),
++    defreg(PF_ATQH),	defreg(PF_ATQBAH), defreg(PF_ATQBAL),
+ };
+ 
+ enum { PHY_R = 1, PHY_W = 2, PHY_RW = PHY_R | PHY_W };
+@@ -306,6 +312,195 @@ flash_eerd_read(E1000State *s, int x)
+            E1000_EEPROM_RW_REG_DONE | r);
+ }
+ 
++static void e1000_aq_get_version(struct e1000_aq_desc *desc)
++{
++	fdbg(e1000_log, DBG_STATUS, "in aq_get_version!\n");
++#define FW_MAJ_TEMP 0x34
++#define FW_MIN_TEMP 0x13
++#define API_MAJ_TEMP 0xfa
++#define API_MIN_TEMP 0xaf
++	desc->param0 = (FW_MAJ_TEMP);
++	desc->param0 |= ((FW_MIN_TEMP << 16));
++	desc->param1 = (API_MAJ_TEMP);
++	desc->param1 |= ((API_MIN_TEMP << 16));
++}
++
++static void e1000_aq_echo(struct e1000_aq_desc *desc)
++{
++	target_phys_addr_t in_buf;
++	uint8_t *my_buf;
++
++	fdbg(e1000_log, DBG_STATUS, "%s\n", __func__);
++
++	if (desc->datalen != 0) {
++		/* create my local buffer */
++		my_buf = qemu_malloc(desc->datalen);
++		
++		/* copyin the indirect buffer */
++		in_buf = ((uint64_t)(desc->addr_high) << 32) | desc->addr_low;
++		my_buf = qemu_malloc(desc->datalen);
++		if (!my_buf) {
++			desc->flags |= E1000_AQ_FLAG_ERR;
++			desc->retval = ENOSPC;
++			goto echo_done;
++		}
++
++		/* copy into a local buffer */
++		cpu_physical_memory_read(in_buf, (void *)my_buf, desc->datalen);
++
++		/* pretend we've done something interesting */
++
++		/* copy back to the user's buffer */
++		cpu_physical_memory_write(in_buf, (void *)my_buf, desc->datalen);
++
++		/* goodbye local buffer */
++		qemu_free(my_buf);
++	}
++echo_done:
++	return;
++}
++
++static int e1000_send_aq_cmd(E1000State *s, struct e1000_aq_desc *desc)
++{
++	struct e1000_aq_desc recv_desc;
++	uint16_t recv_size = sizeof(recv_desc);
++	target_phys_addr_t buffer_addr;
++	uint8_t *buffer;
++	int rc = 0;
++
++	memset(&recv_desc, 0, sizeof(recv_desc));
++
++	fdbg(e1000_log, DBG_STATUS, "%s: command 0x%02x\n", __func__, desc->opcode);
++
++	/* attempt to make connection */
++	if (s->fs == INVALID_SOCKET) {
++		s->fs = locate(NULL);
++		if (s->fs == INVALID_SOCKET) {
++			// Failure to make connection
++			goto err;
++		}
++	}
++
++	/* We have a valid socket here */
++	rc = senddata(s->fs, desc, sizeof(struct e1000_aq_desc));
++	if (rc < 0) {
++		/* failed to send the message */
++		goto err;
++	}
++
++	/* descriptor has a buffer, send it also */
++	if (desc->datalen > 0) {
++		buffer_addr = ((uint64_t)(desc->addr_high) << 32) | desc->addr_low;
++		buffer = qemu_malloc(desc->datalen);
++		if (!buffer) {
++			goto err;
++		}
++
++		cpu_physical_memory_read(buffer_addr, (void *)buffer, desc->datalen);
++
++		rc = senddata(s->fs, buffer, desc->datalen);
++		if (rc < 0) {
++			qemu_free(buffer);
++			goto err;
++		}
++		qemu_free(buffer);
++	}
++
++	recv_size = sizeof(recv_desc);
++	/* Firmware has message, wait for response */
++	rc = recvdata(s->fs, &recv_desc, &recv_size);
++	if (rc < 0) {
++		/* failed to receive firmware response */
++		goto err;
++	}
++
++	/* descriptor has a return buffer, recv it */
++	if (recv_desc.datalen > 0) {
++		buffer_addr = ((uint64_t)(recv_desc.addr_high) << 32) | recv_desc.addr_low;
++		buffer = qemu_malloc(desc->datalen);
++		if (!buffer) {
++			goto err;
++		}
++
++		recv_size = recv_desc.datalen;
++		rc = recvdata(s->fs, buffer, &recv_size);
++		if (rc < 0) {
++			qemu_free(buffer);
++			goto err;
++		}
++		cpu_physical_memory_write(buffer_addr, (void *)buffer, recv_desc.datalen);
++		qemu_free(buffer);
++	}
++
++	fdbg(e1000_log, DBG_VERB, "%s: recv_desc\n", __func__);
++	fdbg(e1000_log, DBG_VERB, "%s: flags=%u\n", __func__, recv_desc.flags);
++	fdbg(e1000_log, DBG_VERB, "%s: opcode=%u\n", __func__, recv_desc.opcode);
++	fdbg(e1000_log, DBG_VERB, "%s: datalen=%u\n", __func__, recv_desc.datalen);
++	fdbg(e1000_log, DBG_VERB, "%s: cookie_high=%u\n", __func__, recv_desc.cookie_high);
++	fdbg(e1000_log, DBG_VERB, "%s: cookie_low=%u\n", __func__, recv_desc.cookie_low);
++	fdbg(e1000_log, DBG_VERB, "%s: param0=%u\n", __func__, recv_desc.param0);
++	fdbg(e1000_log, DBG_VERB, "%s: param1=%u\n", __func__, recv_desc.param1);
++	fdbg(e1000_log, DBG_VERB, "%s: addr_high=%u\n", __func__, recv_desc.addr_high);
++	fdbg(e1000_log, DBG_VERB, "%s: addr_low=%u\n", __func__, recv_desc.addr_low);
++	fdbg(e1000_log, DBG_VERB, "%s: message_length=%u\n", __func__, recv_size);
++	fdbg(e1000_log, DBG_VERB, "%s: expected size=%lu\n", __func__, sizeof(recv_desc));
++	
++	/* Got a valid descriptor back */
++	memcpy(desc, &recv_desc, sizeof(recv_desc));
++	return 0;
++
++ err:
++	fdbg(e1000_log, DBG_ERROR, "%s: command 0x%02x failed\n", __func__, desc->opcode);
++	close(s->fs);
++	s->fs = INVALID_SOCKET;
++	return -1;
++}
++
++static void e1000_set_atq_tail(E1000State *s, int index, uint32_t val)
++{
++	target_phys_addr_t base;
++	struct e1000_aq_desc desc;
++	uint16_t ring_len;
++
++	/* save the new tail value */
++	s->mac_reg[index] = val;
++
++	/* this write triggers action */
++	base = ((uint64_t)s->mac_reg[PF_ATQBAH] << 32) +
++	        s->mac_reg[PF_ATQBAL] + sizeof(struct e1000_aq_desc) *
++	        s->mac_reg[PF_ATQH];
++
++	cpu_physical_memory_read(base, (void *)&desc, sizeof(desc));
++
++	fdbg(e1000_log, DBG_STATUS, "%s: command 0x%02x\n", __func__, desc.opcode);
++	/* attempt to send cmd to firmware
++	 * => fall back to process if failed */
++	if (e1000_send_aq_cmd(s, &desc) < 0) {
++
++		// process
++		switch (desc.opcode) {
++		case e1000_aqc_get_version:
++			e1000_aq_get_version(&desc);
++			break;
++		case e1000_aqc_echo:
++			e1000_aq_echo(&desc);
++			break;
++		default:
++			desc.retval = E1000_AQ_RC_ENOSYS;
++			break;
++		}
++
++		// writeback descriptor
++		desc.flags |= E1000_AQ_FLAG_DD;
++	}
++
++	cpu_physical_memory_write(base, (void *)&desc, sizeof(desc));
++
++	ring_len = s->mac_reg[PF_ATQLEN] & ~E1000_PF_ATQLEN_ATQENABLE_MASK;
++	if (++s->mac_reg[PF_ATQH] >= ring_len)
++		s->mac_reg[PF_ATQH] = 0;
++}
++
+ static void
+ putsum(uint8_t *data, uint32_t n, uint32_t sloc, uint32_t css, uint32_t cse)
+ {
+@@ -833,6 +1028,12 @@ static uint32_t (*macreg_readops[])(E1000State *, int) = {
+     [RA ... RA+31] = &mac_readreg,
+     [MTA ... MTA+127] = &mac_readreg,
+     [VFTA ... VFTA+127] = &mac_readreg,
++    [PF_ATQBAH] = &mac_readreg,
++    [PF_ATQBAL] = &mac_readreg,
++    [PF_ATQLEN] = &mac_readreg,
++    [PF_ATQH] = &mac_readreg,
++    [PF_ATQT] = &mac_readreg,
++
+ };
+ enum { NREADOPS = ARRAY_SIZE(macreg_readops) };
+ 
+@@ -849,6 +1050,11 @@ static void (*macreg_writeops[])(E1000State *, int, uint32_t) = {
+     [RA ... RA+31] = &mac_writereg,
+     [MTA ... MTA+127] = &mac_writereg,
+     [VFTA ... VFTA+127] = &mac_writereg,
++    [PF_ATQBAH] = &mac_writereg,
++    [PF_ATQBAL] = &mac_writereg,
++    [PF_ATQLEN] = &mac_writereg,
++    [PF_ATQH] = &mac_writereg,
++    [PF_ATQT] = &e1000_set_atq_tail,
+ };
+ enum { NWRITEOPS = ARRAY_SIZE(macreg_writeops) };
+ 
+@@ -1075,6 +1281,10 @@ static int
+ pci_e1000_uninit(PCIDevice *dev)
+ {
+     E1000State *d = DO_UPCAST(E1000State, dev, dev);
++    fdbg(e1000_log, DBG_STATUS, "Logging ended.\n");
++    fclose(e1000_log);
++
++    close(d->fs);
+ 
+     cpu_unregister_io_memory(d->mmio_index);
+     qemu_del_vlan_client(&d->nic->nc);
+@@ -1110,6 +1320,15 @@ static int pci_e1000_init(PCIDevice *pci_dev)
+     int i;
+     uint8_t *macaddr;
+ 
++    if (e1000_log == NULL) {
++	    e1000_log = fopen("/tmp/e1000_qemu.log", "a");
++	    ReadOptions("/tmp/e1000.optrc");
++	    setvbuf(e1000_log, NULL, _IONBF, 0);
++	    fdbg(e1000_log, DBG_STATUS, "Logging started.\n");
++    } else {
++	    fdbg(e1000_log, DBG_STATUS, "Logging re-started.\n");
++    }
++
+     pci_conf = d->dev.config;
+ 
+     pci_config_set_vendor_id(pci_conf, PCI_VENDOR_ID_INTEL);
+@@ -1151,6 +1370,9 @@ static int pci_e1000_init(PCIDevice *pci_dev)
+ 
+     add_boot_device_path(d->conf.bootindex, &pci_dev->qdev, "/ethernet-phy@0");
+ 
++    /* Set the firmware socket to be invalid */
++    d->fs = INVALID_SOCKET;
++
+     return 0;
+ }
+ 
+diff --git a/qemu-kvm-0.14.1/hw/e1000_hw.h b/qemu-kvm-0.14.1/hw/e1000_hw.h
+index 9bd8a4b..c9c774e 100644
+--- a/qemu-kvm-0.14.1/hw/e1000_hw.h
++++ b/qemu-kvm-0.14.1/hw/e1000_hw.h
+@@ -723,6 +723,78 @@ struct e1000_tx_desc {
+ #define E1000_TCTL_NRTU   0x02000000    /* No Re-transmit on underrun */
+ #define E1000_TCTL_MULR   0x10000000    /* Multiple request support */
+ 
++/* Admin Queue registers */
++#define E1000_PF_ATQBAH             	0x00006000
++#define E1000_PF_ATQBAH_ATQBAH_SHIFT	0
++#define E1000_PF_ATQBAH_ATQBAH_MASK 	(0xFFFFFFFF << E1000_PF_ATQBAH_ATQBAH_SHIFT)
++#define E1000_PF_ATQBAL             	0x00006004
++#define E1000_PF_ATQBAL_ATQBAL_SHIFT	0
++#define E1000_PF_ATQBAL_ATQBAL_MASK 	(0xFFFFFFFF << E1000_PF_ATQBAL_ATQBAL_SHIFT)
++#define E1000_PF_ATQH           	0x00006008
++#define E1000_PF_ATQH_ATQH_SHIFT	0
++#define E1000_PF_ATQH_ATQH_MASK 	(0x3FF << E1000_PF_ATQH_ATQH_SHIFT)
++#define E1000_PF_ATQLEN                	0x0000600C
++#define E1000_PF_ATQLEN_ATQLEN_SHIFT   	0
++#define E1000_PF_ATQLEN_ATQLEN_MASK    	(0x3FF << E1000_PF_ATQLEN_ATQLEN_SHIFT)
++#define E1000_PF_ATQLEN_ATQENABLE_SHIFT	31
++#define E1000_PF_ATQLEN_ATQENABLE_MASK 	(0x1 << E1000_PF_ATQLEN_ATQENABLE_SHIFT)
++#define E1000_PF_ATQT           	0x00006010
++#define E1000_PF_ATQT_ATQT_SHIFT	0
++#define E1000_PF_ATQT_ATQT_MASK 	(0x3FF << E1000_PF_ATQT_ATQT_SHIFT)
++
++
++enum e1000_admin_queue_cmd {
++	e1000_aqc_get_version		= 0x0001,
++	e1000_aqc_driver_heartbeat	= 0x0002,
++	e1000_aqc_echo			= 0x0003,
++};
++
++/*
++ * Basic adminq descriptor
++ */
++struct e1000_aq_desc {
++        uint16_t flags;
++        uint16_t opcode;
++        uint16_t datalen;
++        uint16_t retval;
++        uint32_t cookie_high;
++        uint32_t cookie_low;
++        uint32_t param0;
++        uint32_t param1;
++        uint32_t addr_high;
++        uint32_t addr_low;
++};
++
++/* command flags and offsets */
++#define E1000_AQ_FLAG_DD_OFF_SHIFT	0
++#define E1000_AQ_FLAG_CMP_OFF_SHIFT	1
++#define E1000_AQ_FLAG_ERR_OFF_SHIFT	2
++#define E1000_AQ_FLAG_VFE_OFF_SHIFT	3
++#define E1000_AQ_FLAG_LB_OFF_SHIFT	4
++#define E1000_AQ_FLAG_RD_OFF_SHIFT	0xA
++#define E1000_AQ_FLAG_VFC_OFF_SHIFT	0xB
++#define E1000_AQ_FLAG_BUF_OFF_SHIFT	0xC
++#define E1000_AQ_FLAG_SI_OFF_SHIFT	0xD
++#define E1000_AQ_FLAG_EI_OFF_SHIFT	0xE
++#define E1000_AQ_FLAG_FE_OFF_SHIFT	0xF
++
++#define E1000_AQ_FLAG_DD		(1 << E1000_AQ_FLAG_DD_OFF_SHIFT)
++#define E1000_AQ_FLAG_CMP 		(1 << E1000_AQ_FLAG_CMP_OFF_SHIFT)
++#define E1000_AQ_FLAG_ERR		(1 << E1000_AQ_FLAG_ERR_OFF_SHIFT)
++#define E1000_AQ_FLAG_VFE		(1 << E1000_AQ_FLAG_VFE_OFF_SHIFT)
++#define E1000_AQ_FLAG_LB		(1 << E1000_AQ_FLAG_LB_OFF_SHIFT)
++#define E1000_AQ_FLAG_RD		(1 << E1000_AQ_FLAG_RD_OFF_SHIFT)
++#define E1000_AQ_FLAG_VFC		(1 << E1000_AQ_FLAG_VFC_OFF_SHIFT)
++#define E1000_AQ_FLAG_BUF		(1 << E1000_AQ_FLAG_BUF_OFF_SHIFT)
++#define E1000_AQ_FLAG_SI		(1 << E1000_AQ_FLAG_SI_OFF_SHIFT)
++#define E1000_AQ_FLAG_EI		(1 << E1000_AQ_FLAG_EI_OFF_SHIFT)
++#define E1000_AQ_FLAG_FE		(1 << E1000_AQ_FLAG_FE_OFF_SHIFT)
++
++enum e1000_admin_queue_err {
++	E1000_AQ_RC_OK		= 0,
++	E1000_AQ_RC_ENOSYS	= 1,
++};
++
+ /* Receive Descriptor */
+ struct e1000_rx_desc {
+     uint64_t buffer_addr; /* Address of the descriptor's data buffer */
+diff --git a/qemu-kvm-0.14.1/hw/msg/dbg.c b/qemu-kvm-0.14.1/hw/msg/dbg.c
+new file mode 100644
+index 0000000..37d3ce2
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/dbg.c
+@@ -0,0 +1,32 @@
++/*
++    dbg -- Functions for console output based on an error threshold.
++*/
++
++/*
++    Copyright (C) 2011 Jacob Keller, Joel Murphy, All rights reserved
++
++    The code in this file is licensed under GPL v2. This license does not 
++    extend to any file bundled with this one.
++*/
++
++#include "dbg.h"
++
++void fdbg(FILE * f, int level, const char *msg, ...)
++{
++    if (OPT.dbglvl >= level) {
++        va_list args;
++	time_t t;
++	char str_t[36];
++
++	/* Print the time stamp */
++	time(&t);
++	strftime(str_t, 35, "%c", localtime(&t));
++	fprintf(f, "%s: ", str_t); 
++
++	/* Print the rest of the message */
++        va_start(args, msg);
++        vfprintf(f, msg, args);
++        va_end(args);
++    }
++}
++
+diff --git a/qemu-kvm-0.14.1/hw/msg/dbg.h b/qemu-kvm-0.14.1/hw/msg/dbg.h
+new file mode 100644
+index 0000000..7bf05c5
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/dbg.h
+@@ -0,0 +1,32 @@
++/*
++    dbg -- Functions for console output based on an error threshold.
++*/
++
++/*
++    Copyright (C) 2011 Jacob Keller, Joel Murphy, All rights reserved
++
++    The code in this file is licensed under GPL v2. This license does not 
++    extend to any file bundled with this one.
++*/
++
++#ifndef DBG_H
++#define DBG_H
++
++#include <time.h>
++#include <stdio.h>
++#include <stdarg.h>
++#include <time.h>
++#include "opt.h"
++
++#define DBG_STATUS 1
++#define DBG_ERROR  2
++#define DBG_WARN   3
++#define DBG_VERB   4
++
++#define dbg(level, msg, ...) \
++    fdbg(stderr, level, msg, ##__VA_ARGS__);
++
++void fdbg(FILE * f, int level, const char *msg, ...);
++
++
++#endif
+diff --git a/qemu-kvm-0.14.1/hw/msg/demo.c b/qemu-kvm-0.14.1/hw/msg/demo.c
+new file mode 100644
+index 0000000..63b5938
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/demo.c
+@@ -0,0 +1,68 @@
++#include "message.h"
++
++int bIsServer = 0;
++
++#define OPTRC_FILE "tinymsg.optrc"
++#define MAX_MSGSIZE 1024
++
++void ProcessArgs(int argc, char **argv)
++{
++	int i;
++	for (i=1;i<argc;i++)
++	{
++		if (argv[i][0] == '-') {
++			switch(tolower(argv[i][1]))
++			{
++			case 's':
++				bIsServer = (~0);
++				break;
++			}
++		}
++	}
++}
++
++int main(int argc, char** argv) {
++  int socket;
++  
++  int rc;
++  uint16_t msg_size = MAX_MSGSIZE;
++
++  char buffer[MAX_MSGSIZE + 1];
++  char msg[MAX_MSGSIZE + 1];
++  
++  ProcessArgs(argc, argv);
++  memset(buffer, 0, MAX_MSGSIZE + 1);
++  memset(msg, 0, MAX_MSGSIZE + 1);
++
++  if (bIsServer) {
++    socket = announce(OPTRC_FILE);
++    if (socket == INVALID_SOCKET) {
++      goto err;
++    }
++
++    rc = recvdata(socket, buffer, &msg_size);
++    if (rc == SOCKET_ERROR) {
++      goto err;
++    }
++
++    printf("%s\n", buffer);
++  } else {
++    socket = locate(OPTRC_FILE);
++    if (socket == INVALID_SOCKET) {
++      goto err;
++    }
++    printf("Enter a message: ");
++    fgets(msg,MAX_MSGSIZE, stdin);
++    rc = senddata(socket, msg, strlen(msg));
++    if (rc == SOCKET_ERROR) {
++      goto err;
++    }
++  }
++ 
++  close(socket);
++  return 0;
++
++ err:
++  close(socket);
++  return -1;
++}
+diff --git a/qemu-kvm-0.14.1/hw/msg/message.c b/qemu-kvm-0.14.1/hw/msg/message.c
+new file mode 100644
+index 0000000..e1825f3
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/message.c
+@@ -0,0 +1,635 @@
++/*
++    message.c -- Messaging API
++    
++    Implements a method of connecting two interfaces using a brute force 
++    multicast announce on all valid sockets and then sending messages of 
++    variable length between the two interfaces.
++
++    The brute force connection method means the two machines don't have to 
++    know each others IP addresses ahead of time. The limitation is they must 
++    be within the same subnet.
++*/
++
++/*
++    Copyright (C) 2011 Jacob Keller, All rights reserved
++
++    The code in this file is licensed under GPL v2. This license does not 
++    extend to any file bundled with this one.
++*/
++
++#include "message.h"
++
++struct announce_msg {
++    uint32_t magic;
++    uint32_t addr;
++    uint16_t port;
++    uint16_t flags;             // reserved
++};
++
++struct msg_header {
++    uint16_t length;
++    uint32_t sum;
++};
++
++#define PACKETS_PER_SEC 10
++
++typedef struct if_panel {
++    PANEL *hs;
++    PANEL *cs;
++} IF_PANEL;
++
++typedef struct if_data {
++    char if_addr[NI_MAXHOST];
++    char if_name[NI_MAXHOST];
++    struct sockaddr sa;
++} IF_DATA;
++
++int buildIfPanel(IF_PANEL * p, IF_DATA * i);
++int populateInterfaceData(IF_DATA * if_d, int *numIfs);
++uint32_t chksum(uint8_t * data, uint16_t length);
++
++int buildIfPanel(IF_PANEL * p, IF_DATA * i)
++{
++    int rc = 0;
++
++    dbg(DBG_WARN, "Using interface '%s' (%s)\n", i->if_addr, i->if_name);
++
++    p->hs = CreatePanel(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
++    if (p->hs == NULL) {
++        return SOCKET_ERROR;
++    }
++
++    rc = BindPanel(p->hs, i->if_addr, OPT.mcastport, 1);
++    if (rc == SOCKET_ERROR) {
++        return rc;
++    }
++
++    rc = SetDestination(p->hs, OPT.mcastip, OPT.mcastport);
++    if (rc == SOCKET_ERROR) {
++        return rc;
++    }
++
++    rc = JoinMulticastGroup(p->hs, NULL);
++    if (rc == SOCKET_ERROR) {
++        return rc;
++    }
++
++    rc = SetMulticastSendInterface(p->hs, &i->sa);
++    if (rc == SOCKET_ERROR) {
++        return rc;
++    }
++
++    rc = SetMulticastLoopback(p->hs, 1);
++    if (rc == SOCKET_ERROR) {
++        return rc;
++    }
++
++    p->cs = CreatePanel(AF_INET, SOCK_STREAM, IPPROTO_TCP);
++    if (p->cs == NULL) {
++        return SOCKET_ERROR;
++    }
++
++    rc = BindPanel(p->cs, i->if_addr, OPT.tcpport, 1);
++    if (rc == SOCKET_ERROR) {
++        return rc;
++    }
++
++    return 0;
++}
++
++int populateInterfaceData(IF_DATA * if_d, int *numIfs)
++{
++#ifdef _WIN32
++    SOCKET s;
++    int numFoundIfs = 0, i, rc = 0, pc = 0;
++    INTERFACE_INFO interfaces[32];
++    unsigned long nReturned = 0;
++
++    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
++    if (s == INVALID_SOCKET) {
++        dbg(DBG_ERROR, "socket(): '%s'\n", sock_error());
++        rc = SOCKET_ERROR;
++        goto err;
++    }
++
++    rc = WSAIoctl(s,
++                  SIO_GET_INTERFACE_LIST,
++                  0,
++                  0,
++                  &interfaces, sizeof(INTERFACE_INFO) * 32, &nReturned, 0, 0);
++
++    if (rc == SOCKET_ERROR) {
++        dbg(DBG_ERROR, "SIO_GET_INTERFACE_LIST: '%s'\n", sock_error());
++        goto err;
++    }
++
++    shutdown(s, SD_BOTH);
++    closesocket(s);
++
++    nReturned /= sizeof(INTERFACE_INFO);
++    for (i = 0; i < nReturned; i++) {
++        INTERFACE_INFO *pIf = &interfaces[i];
++        if ((pIf->iiFlags & IFF_UP) &&
++            (pIf->iiFlags & IFF_MULTICAST) && !(pIf->iiFlags & IFF_LOOPBACK)) {
++
++            /* We check to make sure we can hold the interface */
++            if ((numFoundIfs + 1) > *numIfs) {
++                numFoundIfs++;
++                continue;
++            }
++
++            /* We found a useful interface */
++            rc = getnameinfo(&(pIf->iiAddress.Address),
++                             sizeof(struct sockaddr_in),
++                             if_d[numFoundIfs].if_addr,
++                             NI_MAXHOST, 0, 0, NI_NUMERICHOST);
++            if (rc != 0) {
++                rc = SOCKET_ERROR;
++                return rc;
++            }
++
++            /* Name the adapter */
++            sprintf(if_d[numFoundIfs].if_name, "ifwin%d", i);
++
++            /* Copy the struct sockaddr */
++            memcpy(&if_d[numFoundIfs].sa, &pIf->iiAddress.Address,
++                   sizeof(struct sockaddr));
++
++            /* Increment the total number of adapters */
++            numFoundIfs++;
++        }
++    }
++
++    /* return an error if we didn't have enough storage */
++    if (numFoundIfs > *numIfs) {
++        set_error(ENOMEM);
++        dbg(DBG_ERROR, "populateInterfaceData(): not enough memory\n");
++        rc = SOCKET_ERROR;
++    }
++
++    *numIfs = numFoundIfs;
++    return rc;
++
++ err:
++    return rc;
++#else
++    struct ifaddrs *ifaddrs = NULL;
++    struct ifaddrs *ifa = NULL;
++
++    int numFoundIfs = 0;
++    int rc = 0;
++
++    rc = getifaddrs(&ifaddrs);
++    if (rc == SOCKET_ERROR) {
++        dbg(DBG_ERROR, "getifaddrs(): %s\n", sock_error());
++        return rc;
++    }
++
++    for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
++        if (ifa->ifa_addr == NULL)
++            continue;
++
++        if (ifa->ifa_addr->sa_family != AF_INET)
++            continue;
++
++        if ((ifa->ifa_flags & IFF_UP) &&
++            (ifa->ifa_flags & IFF_MULTICAST) &&
++            !(ifa->ifa_flags & IFF_LOOPBACK)) {
++            /* If we get here, then we want to use this interface
++             * NOTE: first check that we have space. */
++            if ((numFoundIfs + 1) > *numIfs) {
++                numFoundIfs++;
++                continue;
++            }
++
++            rc = getnameinfo(ifa->ifa_addr,
++                             sizeof(struct sockaddr_in),
++                             if_d[numFoundIfs].if_addr,
++                             NI_MAXHOST, 0, 0, NI_NUMERICHOST);
++            if (rc != 0) {
++                rc = SOCKET_ERROR;
++                return rc;
++            }
++
++            /* Copy relevant data into the IF_DATA buffer */
++            strncpy(if_d[numFoundIfs].if_name, ifa->ifa_name, NI_MAXHOST);
++            memcpy(&if_d[numFoundIfs].sa, ifa->ifa_addr,
++                   sizeof(struct sockaddr));
++
++            /* Increment the total number of interfaces */
++            numFoundIfs++;
++        }
++    }
++
++    /* Didn't have enough memory */
++    if (numFoundIfs > *numIfs) {
++        set_error(ENOMEM);
++        dbg(DBG_ERROR, "populateInterfaceData(): not enough memory\n");
++        rc = SOCKET_ERROR;
++    }
++
++    *numIfs = numFoundIfs;
++    freeifaddrs(ifaddrs);
++    return rc;
++#endif
++}
++
++#define MAX_IF_LENGTH 32
++SOCKET announce(const char *optrc)
++{
++    IF_PANEL ifp[MAX_IF_LENGTH];
++    IF_DATA ifd[MAX_IF_LENGTH];
++    int ifd_length = MAX_IF_LENGTH;
++    fd_set readfds;
++    struct timeval tv;
++    int num_packets = 0;
++    int count = 0;
++    int maxSocket = 0;
++    char addr[NI_MAXHOST];
++    struct announce_msg m;
++    socklen_t acceptlen;
++    int accepted = 0;
++    int i;
++    SOCKET socket = INVALID_SOCKET;
++    int rc = 0;
++
++    ReadOptions(optrc);
++
++    memset(ifp, 0, sizeof(IF_PANEL) * 32);
++
++    rc = populateInterfaceData(ifd, &ifd_length);
++    if (rc == SOCKET_ERROR) {
++        dbg(DBG_ERROR, "populateInterfaceData(): '%s'\n", sock_error());
++        goto err;
++    }
++
++    /* We have the interface data in useable form
++     * Now we can build the interface panels */
++    for (i = 0; i < ifd_length; i++) {
++        rc = buildIfPanel(&ifp[i], &ifd[i]);
++        if (rc == SOCKET_ERROR) {
++            dbg(DBG_ERROR, "buildIfPanel(%d): '%s'\n", i, sock_error());
++            goto err;
++        }
++    }
++
++    /* Listen on each interface */
++    for (i = 0; i < ifd_length; i++) {
++        rc = listen(ifp[i].cs->sp_socket, 1);
++        if (rc == SOCKET_ERROR) {
++            dbg(DBG_ERROR, "listen(cs): '%s'\n", sock_error());
++            goto err;
++        }
++    }
++
++    num_packets = OPT.timeout * PACKETS_PER_SEC;
++
++    /* the funny condition causes us to loop forever
++       if we have a timeout of 0 */
++    for (count = 0; (num_packets == 0 || count < num_packets); count++) {
++        m.magic = htonl(OPT.magicnum);
++        m.port = htons(atoi(OPT.tcpport));
++        m.flags = 0;
++
++        for (i = 0; i < ifd_length; i++) {
++            m.addr =
++                ((struct sockaddr_in *)&(ifp[i].cs->sp_bind))->sin_addr.s_addr;
++            rc = sendto(ifp[i].hs->sp_socket, (const char *)&m, sizeof(m), 0,
++                        &(ifp[i].hs->sp_dest), sizeof(ifp[i].hs->sp_dest));
++            if (rc == SOCKET_ERROR) {
++                dbg(DBG_ERROR, "sendto(hs): %s\n", sock_error());
++                goto err;
++            }
++        }
++
++        dbg(DBG_VERB, "Sent announce msg %d to %s\n", count,
++            FormatAddr(&(ifp[0].hs->sp_dest), addr, NI_MAXHOST));
++
++        FD_ZERO(&readfds);
++
++        for (i = 0; i < ifd_length; i++) {
++            if (ifp[i].cs->sp_socket > maxSocket) {
++                maxSocket = ifp[i].cs->sp_socket;
++            }
++            FD_SET(ifp[i].cs->sp_socket, &readfds);
++        }
++
++        tv.tv_sec = 0;
++        tv.tv_usec = 100000;
++        rc = select(maxSocket + 1, &readfds, NULL, NULL, &tv);
++        if (rc < 0) {
++            dbg(DBG_ERROR, "select(cs): %s\n", sock_error());
++            goto err;
++        } else if (rc == 0) {
++            continue;
++        } else {
++            for (i = 0; i < ifd_length; i++) {
++                if (FD_ISSET(ifp[i].cs->sp_socket, &readfds)) {
++                    acceptlen = sizeof(struct sockaddr);
++                    socket =
++                        accept(ifp[i].cs->sp_socket, &(ifp[i].cs->sp_dest),
++                               &acceptlen);
++                    accepted = i;
++                    dbg(DBG_STATUS, "connected to %s\n",
++                        FormatAddr(&(ifp[i].cs->sp_dest), addr, NI_MAXHOST));
++                    break;
++                }
++            }
++
++            /* we have a connection */
++            if (socket != INVALID_SOCKET) {
++                break;
++            }
++        }
++    }
++
++    for (i = 0; i < ifd_length; i++) {
++        if (socket == ifp[i].cs->sp_socket) {
++            DissociatePanel(ifp[i].cs);
++        } else {
++            FreePanel(ifp[i].cs);
++        }
++        rc = LeaveMulticastGroup(ifp[i].hs, NULL);
++        if (rc == SOCKET_ERROR) {
++            goto err;
++        }
++        FreePanel(ifp[i].hs);
++    }
++
++    return socket;
++
++ err:
++    for (i = 0; i < ifd_length || i < MAX_IF_LENGTH; i++) {
++        FreePanel(ifp[i].hs);
++        FreePanel(ifp[i].cs);
++    }
++
++    return INVALID_SOCKET;
++}
++
++SOCKET locate(const char *optrc)
++{
++    PANEL *hs = NULL;
++    PANEL *cs = NULL;
++
++    IF_DATA ifd[MAX_IF_LENGTH];
++    int ifd_length = MAX_IF_LENGTH;
++    int i = 0;
++
++    fd_set readfds;
++    struct timeval tv;
++
++    struct announce_msg m;
++
++    char addr[NI_MAXHOST];
++
++    socklen_t recvlen;
++
++    SOCKET socket = INVALID_SOCKET;
++    int rc = 0;
++
++    ReadOptions(optrc);
++
++    rc = populateInterfaceData(ifd, &ifd_length);
++    if (rc == SOCKET_ERROR) {
++        dbg(DBG_ERROR, "populateInterfaceData(): '%s'\n", sock_error());
++        goto err;
++    }
++
++    hs = CreatePanel(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
++    if (!hs) {
++        dbg(DBG_ERROR, "CreateBoundPanel(hs): %s\n", sock_error());
++        goto err;
++    }
++
++    rc = BindPanel(hs, NULL, OPT.mcastport, 1);
++    if (rc == SOCKET_ERROR) {
++        dbg(DBG_ERROR, "BindPanel(hs), '%s'\n", sock_error());
++        goto err;
++    }
++
++    rc = SetDestination(hs, OPT.mcastip, OPT.mcastport);
++    if (rc == SOCKET_ERROR) {
++        dbg(DBG_ERROR, "SetDestination(hs): %s\n", sock_error());
++        goto err;
++    }
++
++    for (i = 0; i < ifd_length; i++) {
++        rc = JoinMulticastGroup(hs, ifd[i].if_addr);
++        if (rc == SOCKET_ERROR) {
++            dbg(DBG_ERROR, "MakeMulticast(hs): %s\n", sock_error());
++            goto err;
++        }
++    }
++
++    rc = SetMulticastLoopback(hs, 1);
++    if (rc == SOCKET_ERROR) {
++        dbg(DBG_ERROR, "SetMulticastLoopback(hs): %s\n", sock_error());
++        goto err;
++    }
++
++    cs = CreateBoundPanel("0", AF_INET, SOCK_STREAM, IPPROTO_TCP);
++    if (!cs) {
++        dbg(DBG_ERROR, "CreateBoundPanel(cs): %s\n", sock_error());
++        goto err;
++    }
++
++    tv.tv_sec = OPT.timeout;
++    tv.tv_usec = 0;
++
++    while (socket == INVALID_SOCKET) {
++        FD_ZERO(&readfds);
++        FD_SET(hs->sp_socket, &readfds);
++
++        rc = select(hs->sp_socket + 1, &readfds, NULL, NULL,
++                    (OPT.timeout > 0 ? &tv : NULL));
++        if (rc < 0) {
++            dbg(DBG_ERROR, "select(hs): %s\n", sock_error());
++            goto err;
++        } else if (rc == 0) {
++            socket = INVALID_SOCKET;
++            break;
++        }
++
++        /* if we get here, select woke up with a valid packet */
++
++        recvlen = sizeof(struct sockaddr);
++        rc = recvfrom(hs->sp_socket, &m, sizeof(m), 0, &(cs->sp_dest),
++                      &recvlen);
++        if (rc == SOCKET_ERROR) {
++            dbg(DBG_ERROR, "recvfrom(hs): %s\n", sock_error());
++            goto err;
++        }
++
++        m.magic = ntohl(m.magic);
++
++        dbg(DBG_WARN, "received announce (magic=%d) from %s\n",
++            m.magic, FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST));
++
++        if (m.magic == OPT.magicnum) {
++            ((struct sockaddr_in *)&(cs->sp_dest))->sin_addr.s_addr = m.addr;
++            ((struct sockaddr_in *)&(cs->sp_dest))->sin_port = m.port;
++            rc = connect(cs->sp_socket, &(cs->sp_dest),
++                         sizeof(struct sockaddr));
++            if (rc == SOCKET_ERROR) {
++                dbg(DBG_ERROR, "connect(cs): %s\n", sock_error());
++                goto err;
++            } else {
++                dbg(DBG_STATUS, "connected to %s\n",
++                    FormatAddr(&(cs->sp_dest), addr, NI_MAXHOST));
++                socket = cs->sp_socket;
++            }
++        }
++    }
++
++    FreePanel(hs);
++    DissociatePanel(cs);
++
++    return socket;
++
++ err:
++    if (hs) {
++        FreePanel(hs);
++    }
++
++    if (cs) {
++        FreePanel(cs);
++    }
++
++    return INVALID_SOCKET;
++}
++
++uint32_t chksum(uint8_t * data, uint16_t length)
++{
++    uint32_t sum = 0;
++    uint32_t value = 0;
++    int extra = length % 4;
++    int i = 0;
++
++    for (i = 0; i < (length - extra); i += 4) {
++        value = data[i];
++        value |= data[i + 1] << 8;
++        value |= data[i + 2] << 16;
++        value |= data[i + 3] << 24;
++
++        sum ^= value;
++    }
++
++    if (extra > 0) {
++        value = (extra >= 1 ? data[i] : 0);
++        value |= (extra >= 2 ? data[i + 1] : 0) << 8;
++        value |= (extra >= 3 ? data[i + 2] : 0) << 16;
++        sum ^= value;
++    }
++
++    return sum;
++}
++
++int senddata(SOCKET socket, void *data, uint16_t length)
++{
++    int rc = 0;
++    struct msg_header m;
++
++    if (length <= 0) {
++        set_error(EINVAL);
++        return -1;
++    }
++
++    m.length = htons(length);
++    m.sum = htonl(chksum(data, length));
++
++    rc = send(socket, &m, sizeof(struct msg_header), 0);
++    if (rc == 0) {
++        set_error(ECANCELED);
++        return -1;
++    } else if (rc < 0) {
++        return -1;
++    }
++
++    dbg(DBG_VERB, "senddata: send length=%u\n", length);
++
++    rc = send(socket, data, length, 0);
++    if (rc == 0) {
++        set_error(ECANCELED);
++        return -1;
++    } else if (rc < 0) {
++        return rc;
++    }
++
++    return rc;
++}
++
++int recvdata(SOCKET socket, void *data, uint16_t * length)
++{
++    int rc = 0;
++    int recv_length = sizeof(struct msg_header);
++    int recv_sum = 0;
++    struct msg_header m;
++    struct msg_header b;
++
++    /* PEEK at the message length 
++     * necessary to verify that buffer is large enough
++     * and still allow receive of message after check
++     */
++    rc = recv(socket, &m, recv_length, MSG_PEEK);
++    if (rc == 0) {
++        set_error(ECANCELED);
++        return -1;
++    } else if (rc < 0) {
++        return -1;
++    } else if (rc != sizeof(struct msg_header)) {
++        set_error(ECANCELED);
++        return -1;
++    }
++
++    m.length = ntohs(m.length);
++    m.sum = ntohl(m.sum);
++    if (m.length > *length) {
++        set_error(ENOMEM);
++        return -1;
++    }
++
++    /* remove the header from the socket stream
++     * necessary because we peeked at the message
++     * length before hand.
++     * NOTE: this header will not be removed
++     * if the buffer was not long enough
++     */
++    recv_length = sizeof(struct msg_header);
++    rc = recv(socket, &b, recv_length, 0);
++    if (rc == 0) {
++        set_error(ECANCELED);
++        return -1;
++    } else if (rc < 0) {
++        return -1;
++    }
++
++    dbg(DBG_VERB, "recvdata: recv length %u\n", m.length);
++
++    /* receive the raw data
++     * now we actually retrieve the data
++     * and error out if we don't receive
++     * the same amount as specified
++     * in the msg_length
++     */
++    rc = recv(socket, data, m.length, 0);
++    if (rc == 0) {
++        set_error(ECANCELED);
++        return -1;
++    } else if (rc < 0) {
++        return -1;
++    } else if (rc != m.length) {
++        set_error(ECANCELED);
++        return -1;
++    }
++
++    recv_sum = chksum(data, m.length);
++    if (m.sum ^ recv_sum) {
++        dbg(DBG_WARN, "chksum expected %u\n", m.sum);
++        dbg(DBG_WARN, "chksum computed %u\n", recv_sum);
++    }
++
++    /* set the length to the actual received length */
++    *length = m.length;
++    return 0;
++}
+diff --git a/qemu-kvm-0.14.1/hw/msg/message.h b/qemu-kvm-0.14.1/hw/msg/message.h
+new file mode 100644
+index 0000000..7e7979c
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/message.h
+@@ -0,0 +1,88 @@
++/*
++    message -- Messaging API
++    
++    Implements a method of connecting two interfaces using a brute force 
++    multicast announce on all valid sockets and then sending messages of 
++    variable length between the two interfaces.
++
++    The brute force connection method means the two machines don't have to 
++    know each others IP addresses ahead of time. The limitation is they must 
++    be within the same subnet.
++*/
++
++/*
++    Copyright (C) 2011 Jacob Keller, All rights reserved
++
++    The code in this file is licensed under GPL v2. This license does not 
++    extend to any file bundled with this one.
++*/
++
++#ifdef _WIN32
++#define _CRT_SECURE_NO_WARNINGS
++#pragma comment(lib, "Ws2_32.lib")
++#include <WinSock2.h>
++#include <WS2tcpip.h>
++#include "stdint.h"
++#else
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <stdlib.h>
++#include <netdb.h>
++#include <errno.h>
++#include <stdint.h>
++#include <sys/time.h>
++#include <ifaddrs.h>
++#include <net/if.h>
++typedef int SOCKET;
++#define FALSE 0
++#define TRUE 1
++#endif
++#include <stdio.h>
++#include <stdarg.h>
++#include "panel.h"
++#include "sockerr.h"
++#include "opt.h"
++#include "dbg.h"
++
++/*
++ * anounce()
++ * 
++ * the announce function will multicast a message
++ * announcing this functions service via a unique
++ * magic number.
++ *
++ * Returns a socket
++ */
++SOCKET announce(const char *optrc);
++
++/*
++ * locate()
++ * 
++ * the locate function will listen for incoming announcement messages
++ * and will connect to the first valid server
++ * 
++ * Returns a socket
++ */
++SOCKET locate(const char *optrc);
++
++/*
++ * senddata()
++ * 
++ * this function will send a message of raw bytes of a certain length
++ * across the socket, by first sending the length in a fixed value
++ * "header", then sending the buffer.
++ */
++int senddata(SOCKET socket, void *data, uint16_t length);
++
++/*
++ * recvdata()
++ *
++ * this function will receive a message from the socket
++ * and put its value into the buffer. It will return an
++ * error code if the given buffer is not large enough to hold
++ * all of the data
++ *
++ * it will modify the length value to be the actual
++ * length of the message returned.
++ */
++int recvdata(SOCKET socket, void *data, uint16_t * length);
+diff --git a/qemu-kvm-0.14.1/hw/msg/opt.c b/qemu-kvm-0.14.1/hw/msg/opt.c
+new file mode 100644
+index 0000000..3ba0f9a
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/opt.c
+@@ -0,0 +1,73 @@
++/*
++    opt -- A simple options file library.
++
++    Reads options from a specified file into a global OPT struct.
++    This is a non-robust library that depends on a text file with 
++    lines of the form:
++    
++    <token>=<value>
++
++    Any unrecognized line, and any text to the right of a '#' symbol
++    is ignored.
++*/
++
++/*
++	Copyright (C) 2011 Joel Murphy, All rights reserved
++
++	The code in this file is licensed under GPLv2. This license does not 
++	extend to any other files bundlded with this file.
++*/
++
++#include "opt.h"
++
++const char *default_file = OPTRC;
++struct options OPT = { MULTICAST_ADDR, MULTICAST_PORT, MAGIC_NUMBER, TCP_PORT, CONNECT_TIMEOUT, DBGLVL, 0 };
++
++void ReadOptions(const char *filename)
++{
++    FILE *f = NULL;
++    char line[OPTBUFLEN];
++    char *eqpos;
++
++    int rc = 0;
++
++    if (OPT.set) {
++        return;
++    }
++
++    if (filename == NULL) {
++        filename = default_file;
++    }
++
++    OPT.set = 1;
++
++    f = fopen(filename, "r");
++    if (f) {
++        while (!feof(f)) {
++            rc = fscanf(f, "%s\n", line);
++            strtok(line, "#");  // Remove comment from string
++            eqpos = strchr(line, '=');
++            if (eqpos) {
++                eqpos[0] = '\0';
++
++                if (strcmp(line, "mcastip") == 0) {
++                    strcpy(OPT.mcastip, eqpos + 1);
++                } else if (strcmp(line, "mcastport") == 0) {
++                    strcpy(OPT.mcastport, eqpos + 1);
++                } else if (strcmp(line, "tcpport") == 0) {
++                    strcpy(OPT.tcpport, eqpos + 1);
++                } else if (strcmp(line, "magicnum") == 0) {
++                    OPT.magicnum = atoi(eqpos + 1);
++                } else if (strcmp(line, "timeout") == 0) {
++                    OPT.timeout = atoi(eqpos + 1);
++                } else if (strcmp(line, "dbglvl") == 0) {
++                    OPT.dbglvl = atoi(eqpos + 1);
++                }
++            }
++        }
++
++        if (fclose(f)) {
++            fprintf(stderr, "Failed to close %s.\n", filename);
++        }
++    }
++}
+diff --git a/qemu-kvm-0.14.1/hw/msg/opt.h b/qemu-kvm-0.14.1/hw/msg/opt.h
+new file mode 100644
+index 0000000..ec48fa1
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/opt.h
+@@ -0,0 +1,57 @@
++/*
++    opt -- A simple options file library.
++
++    Reads options from a specified file into a global OPT struct.
++    This is a non-robust library that depends on a text file with 
++    lines of the form:
++    
++    <token>=<value>
++
++    Any unrecognized line, and any text to the right of a '#' symbol
++    is ignored.
++*/
++
++/*
++	Copyright (C) 2011 Joel Murphy, All rights reserved
++
++	The code in this file is licensed under GPLv2. This license does not 
++	extend to any other files bundlded with this file.
++*/
++
++#ifndef OPT_H_
++#define OPT_H_
++#define _CRT_SECURE_NO_WARNINGS
++#include <stdio.h>
++#include <string.h>
++#include <stdlib.h>
++#include <stdint.h>
++
++#define OPTRC "optrc"
++#define OPTBUFLEN 1024
++
++/* Default option values */
++#define MULTICAST_ADDR "234.1.1.10"
++#define MULTICAST_PORT "9751"
++#define MAGIC_NUMBER 0xe1000
++#define TCP_PORT "9752"
++#define CONNECT_TIMEOUT 0       //10
++#define DBGLVL 3                //0
++
++/*
++ * A structure for handling options.
++ */
++
++struct options {
++    char mcastip[16];           // IP only, URL not allowed
++    char mcastport[6];
++    uint32_t magicnum;          // Magic number for broadcast packets
++    char tcpport[6];
++    int timeout;
++    int dbglvl;
++    int set;
++};
++
++extern struct options OPT;
++
++void ReadOptions(const char *filename);
++#endif
+diff --git a/qemu-kvm-0.14.1/hw/msg/panel.c b/qemu-kvm-0.14.1/hw/msg/panel.c
+new file mode 100644
+index 0000000..5ab3440
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/panel.c
+@@ -0,0 +1,539 @@
++/* 
++    panel -- Socket simplification tool.
++
++    Panels are a conceptual extension of a socket. They are 
++    intended to assist in the creation of socket programs by reducing 
++    the amount of code the author must write and by reducing code differences
++    between Windows and Linux.
++*/
++
++/*
++    Copyright (C) 2011 Joel Murphy, Jacob Keller, All rights reserved
++    The code in this file is licensed under GPL v2. This license does not 
++    extend to any file bundled with this one.
++*/
++
++#include "panel.h"
++
++/* Used as a helper function to create the "pre-zeroed" panel.
++ */
++PANEL *CreateEmptyPanel(void)
++{
++    PANEL *p = NULL;
++    size_t ps = sizeof(PANEL);
++
++    // Prepare necessary memory
++    p = (PANEL *) malloc(ps);
++    if (p == NULL) {
++        return NULL;
++    }
++    memset(p, 0, ps);
++
++    return p;
++}
++
++/* Creates a panel with only an active socket. Useful for most of your 
++ * socket-panel needs.
++ */
++PANEL *CreatePanel(int af, int type, int proto)
++{
++    PANEL *p = CreateEmptyPanel();
++
++    // Create the socket.
++    p->sp_socket = socket(af, type, proto);
++    if (p->sp_socket == INVALID_SOCKET) {
++        FreePanel(p);
++        return NULL;
++    }
++
++    p->sp_family = af;
++    p->sp_socktype = type;
++    p->sp_protocol = proto;
++    sp_setflag(p->sp_flags, SP_F_VALID);
++
++    return p;
++}
++
++/* Creates a panel that is pre-bound to an outgoing port. The contained 
++ * socket will listen on all active interfaces. Use CreatePanel() then 
++ * BindPanel() to listen on a specific interface.
++ */
++PANEL *CreateBoundPanel(const char *svc, int af, int type, int proto)
++{
++    PANEL *p = CreatePanel(af, type, proto);
++    int rc;
++
++    // Bind socket to address
++    rc = BindPanel(p, INADDR_ANY, svc, 1);
++    if (rc == SOCKET_ERROR) {
++        FreePanel(p);
++        return NULL;
++    }
++
++    return p;
++}
++
++/* To be called after an accept to insert a socket into a panel.
++ */
++PANEL *SocketToPanel(int s, struct sockaddr * addr)
++{
++    PANEL *p = CreateEmptyPanel();
++
++    // Copy received data
++    p->sp_socket = s;
++    memcpy(&(p->sp_bind), addr, sizeof(addr));
++    sp_setflag(p->sp_flags, SP_F_VALID);
++
++    return p;
++}
++
++/* Nicely cleans up after an unused panel.
++ */
++void FreePanel(PANEL * p)
++{
++    if (p) {
++#ifdef _WIN32
++        shutdown(p->sp_socket, SD_BOTH);
++        closesocket(p->sp_socket);
++#else
++        close(p->sp_socket);
++#endif
++        free(p);
++    }
++}
++
++/* Nicely delets panel information but leaves socket intact*/
++void DissociatePanel(PANEL * p)
++{
++    if (p) {
++        free(p);
++    }
++}
++
++/* Resolves a general address and service specifier into a net-standard 
++ * internet address and port. The service an be a generalized service 
++ * specifier (e.g. "http", "ftp", "smtp", etc.) or a specific port.
++ * Returns NULL on error. Use freeaddrinfo() on the return result after 
++ * you are done with it.
++ */
++struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af,
++                             int type, int proto)
++{
++    struct addrinfo hints, *res = NULL;
++    int rc;
++
++    memset(&hints, 0, sizeof(hints));
++    hints.ai_flags = ((addr) ? 0 : AI_PASSIVE);
++    hints.ai_family = af;
++    hints.ai_socktype = type;
++    hints.ai_protocol = proto;
++
++    rc = getaddrinfo(addr, svc, &hints, &res);
++    if (rc == 0) {
++        return res;
++    } else {
++        return NULL;
++    }
++}
++
++/* Causes a panel to bind to the stored bind address. Must be used on a 
++ * valid panel.
++ */
++int BindPanel(PANEL * p, const char *addr, const char *svc, int reuse)
++{
++    struct addrinfo *ai = NULL;
++    int rc;
++
++    if (sp_getflag(p->sp_flags, SP_F_VALID)) {
++        // Resolve bind address
++        ai = ResolveAddr(addr, svc, p->sp_family, p->sp_socktype,
++                         p->sp_protocol);
++        if (ai == NULL)
++            return SOCKET_ERROR;
++        memcpy(&(p->sp_bind), ai->ai_addr, ai->ai_addrlen);
++        freeaddrinfo(ai);
++    } else {
++        set_error(EPERM);       // Operation not permitted.
++        return SOCKET_ERROR;
++    }
++
++    // Set socket to reusable
++    rc = setsockopt(p->sp_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse,
++                    sizeof(reuse));
++    if (rc == SOCKET_ERROR) {
++        return rc;
++    }
++    // Bind the socket
++    sp_setflag(p->sp_flags, SP_F_LISTENER);
++    rc = bind(p->sp_socket, &(p->sp_bind), sizeof(p->sp_bind));
++    return rc;
++}
++
++/* Aligns outgoing traffic for the panel. Must be used on a valid panel.
++ */
++int SetDestination(PANEL * p, const char *addr, const char *svc)
++{
++    struct addrinfo *ai = NULL;
++
++    if (sp_getflag(p->sp_flags, SP_F_VALID)) {
++        // Resolve destination address
++        ai = ResolveAddr(addr, svc, p->sp_family, p->sp_socktype,
++                         p->sp_protocol);
++        if (ai == NULL)
++            return SOCKET_ERROR;
++        memcpy(&(p->sp_dest), ai->ai_addr, ai->ai_addrlen);
++        freeaddrinfo(ai);
++    } else {
++        set_error(EPERM);       // Operation not permitted.
++        return SOCKET_ERROR;
++    }
++
++    sp_setflag(p->sp_flags, SP_F_SENDER);
++    return NO_ERROR;
++}
++
++/* Sets the socket option with the linger structure. This doesn't work in 
++ * Windows.
++ */
++int SetOptionLinger(PANEL * p, uint16_t opt_yesno, uint16_t opt_delay)
++{
++    int level, option, optlen;
++    struct linger optval;
++    int rc;
++
++    optlen = sizeof(optval);
++    memset((void *)&optval, 0, optlen);
++
++    level = SOL_SOCKET;
++    option = SO_LINGER;
++    optval.l_onoff = opt_yesno;
++    optval.l_linger = opt_delay;
++
++    rc = setsockopt(p->sp_socket, level, option, &optval, optlen);
++    return rc;
++}
++
++/* Used to set any true or false option
++ */
++int SetOption(PANEL * p, int level, int option, int optval)
++{
++    int optlen = sizeof(optval);
++    int rc;
++
++    rc = setsockopt(p->sp_socket, level, option, (const char *)&optval, optlen);
++    return rc;
++}
++
++/* Make an existing panel into a multicast panel by joining the multicast group
++ * and setting the send interface. Uses p->sp_dest which must be set prior to 
++ * calling.
++ */
++int JoinMulticastGroup(PANEL * p, const char *ifaddr)
++{
++    int level, option, optlen;
++    char *optval;
++    int rc;
++
++    if ((p->sp_dest.sa_family == AF_INET)
++        || (p->sp_dest.sa_family == AF_UNSPEC)) {
++        struct ip_mreq mreq;
++        struct sockaddr_in *sin = (struct sockaddr_in *)&(p->sp_dest);
++        struct sockaddr_in *sbind = (struct sockaddr_in *)&(p->sp_bind);
++
++        // IPv4 multicast membership parameters
++        level = IPPROTO_IP;
++        option = IP_ADD_MEMBERSHIP;
++        optval = (char *)&mreq;
++        optlen = sizeof(mreq);
++        mreq.imr_multiaddr.s_addr = sin->sin_addr.s_addr;
++        if (ifaddr) {
++            inet_pton(AF_INET, ifaddr, &mreq.imr_interface.s_addr);
++        } else {
++            mreq.imr_interface.s_addr = sbind->sin_addr.s_addr;
++        }
++    } else if (p->sp_dest.sa_family == AF_INET6) {
++        struct ipv6_mreq mreq6;
++        struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&(p->sp_dest);
++
++        // IPv6 multicast membership parameters
++        level = IPPROTO_IPV6;
++        option = IPV6_ADD_MEMBERSHIP;
++        optval = (char *)&mreq6;
++        optlen = sizeof(mreq6);
++#ifdef _WIN32
++        sin6->sin6_scope_id = ScopeLevelSubnet;
++#else
++        sin6->sin6_scope_id = 0;
++#endif
++        mreq6.ipv6mr_multiaddr = sin6->sin6_addr;
++        mreq6.ipv6mr_interface = sin6->sin6_scope_id;
++    } else {
++        set_error(EAFNOSUPPORT);    // Address family not supported
++        return SOCKET_ERROR;
++    }
++
++    // Join multicast group
++    rc = setsockopt(p->sp_socket, level, option, optval, optlen);
++    if (rc == SOCKET_ERROR) {
++        return SOCKET_ERROR;
++    }
++
++    sp_setflag(p->sp_flags, SP_F_MULTICAST);
++    return rc;
++}
++
++/* Gracefully leave the multicast group.
++ */
++int LeaveMulticastGroup(PANEL * p, const char *ifaddr)
++{
++    int level, option, optlen;
++    char *optval;
++    int rc;
++
++    if ((p->sp_dest.sa_family == AF_INET)
++        || (p->sp_dest.sa_family == AF_UNSPEC)) {
++        struct ip_mreq mreq;
++        struct sockaddr_in *sin = (struct sockaddr_in *)&(p->sp_dest);
++        struct sockaddr_in *sbind = (struct sockaddr_in *)&(p->sp_bind);
++
++        // IPv4 multicast membership parameters
++        level = IPPROTO_IP;
++        option = IP_DROP_MEMBERSHIP;
++        optval = (char *)&mreq;
++        optlen = sizeof(mreq);
++        mreq.imr_multiaddr.s_addr = sin->sin_addr.s_addr;
++        if (ifaddr) {
++            inet_pton(AF_INET, ifaddr, &mreq.imr_interface.s_addr);
++        } else {
++            mreq.imr_interface.s_addr = sbind->sin_addr.s_addr;
++        }
++    } else if (p->sp_dest.sa_family == AF_INET6) {
++        struct ipv6_mreq mreq6;
++        struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&(p->sp_dest);
++
++        // IPv6 multicast membership parameters
++        level = IPPROTO_IPV6;
++        option = IPV6_DROP_MEMBERSHIP;
++        optval = (char *)&mreq6;
++        optlen = sizeof(mreq6);
++#ifdef _WIN32
++        sin6->sin6_scope_id = ScopeLevelSubnet;
++#else
++        sin6->sin6_scope_id = 0;
++#endif
++        mreq6.ipv6mr_multiaddr = sin6->sin6_addr;
++        mreq6.ipv6mr_interface = sin6->sin6_scope_id;
++    } else {
++        set_error(EAFNOSUPPORT);    // Address family not supported
++        return SOCKET_ERROR;
++    }
++
++    // Join multicast group
++    rc = setsockopt(p->sp_socket, level, option, optval, optlen);
++    if (rc == SOCKET_ERROR) {
++        return SOCKET_ERROR;
++    }
++
++    sp_clearflag(p->sp_flags, SP_F_MULTICAST);
++    return rc;
++}
++
++/* Override the default interface to send multicast messages from. If this 
++ * is not called, the system default is used.
++ */
++int SetMulticastSendInterface(PANEL * p, struct sockaddr *addr)
++{
++    int optlvl, option, optlen;
++    char *optval;
++    int rc;
++
++    // IPv4 send interface parameters
++    if (addr->sa_family == AF_INET) {
++        optlvl = IPPROTO_IP;
++        option = IP_MULTICAST_IF;
++        optval = (char *)&((struct sockaddr_in *)addr)->sin_addr.s_addr;
++        optlen = sizeof(((struct sockaddr_in *) addr)->sin_addr.s_addr);
++    } else if (addr->sa_family == AF_INET6) {
++        // IPv6 send interface parameters
++        optlvl = IPPROTO_IPV6;
++        option = IPV6_MULTICAST_IF;
++        optval = (char *)&(((struct sockaddr_in6 *)addr)->sin6_scope_id);
++        optlen = sizeof(((struct sockaddr_in6 *) addr)->sin6_scope_id);
++    } else {
++        set_error(EAFNOSUPPORT);    // Address family not supported
++        return SOCKET_ERROR;
++    }
++    rc = setsockopt(p->sp_socket, optlvl, option, optval, optlen);
++    if (rc == SOCKET_ERROR) {
++        return SOCKET_ERROR;
++    }
++
++    return rc;
++}
++
++/* Set the time-to-live (TTL) value for a multicast panel.
++ */
++int SetMulticastTTL(PANEL * p, int ttl)
++{
++    int level, ttl_opt, ttl_len;
++    char *ttl_val;
++    int rc;
++
++    if (p->sp_dest.sa_family == AF_INET) {
++        level = IPPROTO_IP;
++        ttl_opt = IP_MULTICAST_TTL;
++    } else if (p->sp_dest.sa_family == AF_INET6) {
++        level = IPPROTO_IPV6;
++        ttl_opt = IPV6_MULTICAST_HOPS;
++    } else {
++        return SOCKET_ERROR;
++    }
++
++    ttl_val = (char *)&ttl;
++    ttl_len = sizeof(ttl);
++
++    rc = setsockopt(p->sp_socket, level, ttl_opt, ttl_val, ttl_len);
++    if (rc == SOCKET_ERROR) {
++        set_error(EAFNOSUPPORT);    // Address family not supported
++        return SOCKET_ERROR;
++    }
++
++    return 0;
++}
++
++/* Sets whether multicast packets, sent by a given interface, are processed by 
++ * the originating host. Loopback is on by default.
++ */
++int SetMulticastLoopback(PANEL * p, int loopval)
++{
++    char *optval = NULL;
++    int optlevel = 0, option = 0, optlen = 0, rc;
++
++    rc = NO_ERROR;
++    if (p->sp_dest.sa_family == AF_INET) {
++        // Set the v4 options
++        optlevel = IPPROTO_IP;
++        option = IP_MULTICAST_LOOP;
++        optval = (char *)&loopval;
++        optlen = sizeof(loopval);
++    } else if (p->sp_dest.sa_family == AF_INET6) {
++        // Set the v6 options
++        optlevel = IPPROTO_IPV6;
++        option = IPV6_MULTICAST_LOOP;
++        optval = (char *)&loopval;
++        optlen = sizeof(loopval);
++    } else {
++        set_error(EAFNOSUPPORT);    // Address family not supported
++        return SOCKET_ERROR;
++    }
++
++    // Set the multpoint loopback
++    rc = setsockopt(p->sp_socket, optlevel, option, optval, optlen);
++    if (rc == SOCKET_ERROR) {
++        return SOCKET_ERROR;
++    }
++
++    return NO_ERROR;
++}
++
++/* Turns an address into presentation format. The return value is the pointer
++ * to buf.
++ */
++char *FormatAddr(struct sockaddr *sa, char *buf, int buflen)
++{
++    struct sockaddr_in *sin = (struct sockaddr_in *)sa;
++    struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)sa;
++
++    if ((sa->sa_family == AF_UNSPEC) || (sa->sa_family == AF_INET)) {
++        inet_ntop(sin->sin_family, &(sin->sin_addr), buf, buflen);
++        sprintf(buf, "%s:%d", buf, ntohs(sin->sin_port));
++    } else if (sa->sa_family == AF_INET6) {
++        inet_ntop(sin6->sin6_family, &(sin6->sin6_addr), buf, buflen);
++        sprintf(buf, "%s/%d", buf, ntohs(sin6->sin6_port));
++    } else {
++        sprintf(buf, "<unsupported address format>");
++    }
++
++    return buf;
++}
++
++/* Print information on an entire panel.
++ */
++void PrintPanel(FILE * f, PANEL * p)
++{
++    char buf[NI_MAXHOST];
++    fprintf(f, "PANEL:\n");
++    fprintf(f, "  Socket ID: %d\n", p->sp_socket);
++    fprintf(f, "  Destination: %s", FormatAddr(&(p->sp_dest), buf, NI_MAXHOST));
++    PrintAddrFamily(f, p->sp_dest.sa_family);
++    fprintf(f, "\n  Bind: %s", FormatAddr(&(p->sp_bind), buf, NI_MAXHOST));
++    PrintAddrFamily(f, p->sp_bind.sa_family);
++    fprintf(f, "\n");
++}
++
++/* Prints address family value */
++void PrintAddrFamily(FILE * f, int af)
++{
++    switch (af) {
++    case AF_INET:
++        fprintf(f, ", Family: AF_INET");
++        break;
++    case AF_INET6:
++        fprintf(f, ", Family: AF_INET6");
++        break;
++    default:
++        fprintf(f, ", Family: UNKNOWN");
++        break;
++    }
++}
++
++void PrintAddrProtocol(FILE * f, int proto)
++{
++    switch (proto) {
++    case IPPROTO_IP:
++        fprintf(f, ", Protocol: IPPROTO_IP");
++        break;
++    case IPPROTO_IPV6:
++        fprintf(f, ", Protocol: IPPROTO_IPV6");
++        break;
++    case IPPROTO_TCP:
++        fprintf(f, ", Protocol: IPPROTO_TCP");
++        break;
++    case IPPROTO_UDP:
++        fprintf(f, ", Protocol: IPPROTO_UDP");
++        break;
++    default:
++        fprintf(f, ", Protocol: UNKNOWN");
++        break;
++    }
++}
++
++/* Print all addresses in an Addrinfo linked list.
++ */
++void PrintAddrinfo(FILE * f, struct addrinfo *ai)
++{
++    struct addrinfo *p = ai;
++
++    if (ai) {
++        while (p != NULL) {
++            fprintf(f, "  Address: ");
++            PrintAddr(f, ai->ai_addr);
++            PrintAddrFamily(f, ai->ai_family);
++            PrintAddrProtocol(f, ai->ai_protocol);
++            fprintf(f, "\n");
++            p = p->ai_next;
++        }
++    } else {
++        fprintf(f, "No address information (null pointer).");
++    }
++}
++
++/* Print information on an address.
++ */
++void PrintAddr(FILE * f, struct sockaddr *sa)
++{
++    char buf[NI_MAXHOST];
++
++    fprintf(f, "%s", FormatAddr(sa, buf, NI_MAXHOST));
++    fflush(f);
++}
+diff --git a/qemu-kvm-0.14.1/hw/msg/panel.h b/qemu-kvm-0.14.1/hw/msg/panel.h
+new file mode 100644
+index 0000000..d5d7346
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/panel.h
+@@ -0,0 +1,108 @@
++/* 
++    panel -- Socket simplification tool.
++
++    Panels are a conceptual extension of a socket. They are 
++    intended to assist in the creation of socket programs by reducing 
++    the amount of code the author must write and by reducing code differences
++    between Windows and Linux.
++*/
++
++/*
++    Copyright (C) 2011 Joel Murphy, Jacob Keller, All rights reserved
++    The code in this file is licensed under GPL v2. This license does not 
++    extend to any file bundled with this one.
++*/
++
++#ifndef PANEL_H
++#define PANEL_H
++
++#ifdef _WIN32
++#define _CRT_SECURE_NO_WARNINGS
++#pragma comment(lib, "Ws2_32.lib")
++#include <WinSock2.h>
++#include <WS2tcpip.h>
++#include <WinError.h>
++#include "stdint.h"
++#else
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <stdlib.h>
++#include <netdb.h>
++#include <stdint.h>
++#include <unistd.h>
++#include <arpa/inet.h>
++#endif
++#include <stdio.h>
++#include <string.h>
++#include <stdlib.h>
++#include "sockerr.h"
++
++/*
++ * A trio of Winsock constants. 
++ */
++#ifndef NO_ERROR
++#define NO_ERROR 0
++#endif
++#ifndef INVALID_SOCKET
++#define INVALID_SOCKET -1
++#endif
++#ifndef SOCKET_ERROR
++#define SOCKET_ERROR (~0)
++#endif
++
++/* Flag Macros & Flags
++ */
++#define sp_setflag(var,flag)	var = (var | flag)
++#define sp_getflag(var,flag)	(var & flag)
++#define sp_clearflag(var,flag)	var = (var & ~(flag))
++#define SP_F_VALID		0x0001
++#define SP_F_LISTENER	0x0002
++#define SP_F_SENDER		0x0004
++#define SP_F_MULTICAST	0x0010
++
++/*
++ * A "socket-panel" structure that keeps track of relevant creation
++ * data.
++ */
++typedef struct socket_panel {
++    uint32_t sp_socket;
++    struct sockaddr sp_bind;
++    struct sockaddr sp_dest;
++    uint32_t sp_family;
++    uint32_t sp_socktype;
++    uint32_t sp_protocol;
++    uint16_t sp_flags;
++    uint16_t sp_zero;
++} SOCKET_PANEL, PANEL;
++
++/* Functions for creating socket panels. */
++PANEL *CreateEmptyPanel(void);
++PANEL *CreatePanel(int af, int type, int proto);
++PANEL *CreateBoundPanel(const char *svc, int af, int type, int proto);
++PANEL *SocketToPanel(int s, struct sockaddr *addr);
++void FreePanel(PANEL * p);
++void DissociatePanel(PANEL * p);
++/* == UTILITY FUNCTIONS */
++struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af,
++                             int type, int proto);
++/* == MANIPULATOR FUNCTIONS */
++int BindPanel(PANEL * p, const char *addr, const char *svc, int reuse);
++int SetDestination(PANEL * p, const char *addr, const char *svc);
++int SetOptionLinger(PANEL * p, uint16_t opt_yesno, uint16_t opt_delay);
++int SetOption(PANEL * p, int level, int option, int optval);
++/* -- Functions for multicasting */
++int JoinMulticastGroup(PANEL * p, const char *ifaddr);
++int LeaveMulticastGroup(PANEL * p, const char *ifaddr);
++int SetMulticastSendInterface(PANEL * p, struct sockaddr *addr);
++int SetMulticastTTL(PANEL * p, int ttl);
++int SetMulticastLoopback(PANEL * p, int loopval);
++/* == Debugging functions */
++/* -- Fuctions for getting human-readable values on sockets. */
++char *FormatAddr(struct sockaddr *sa, char *buf, int buflen);
++void PrintPanel(FILE * f, PANEL * p);
++void PrintAddrFamily(FILE * f, int af);
++void PrintAddrProtocol(FILE * f, int proto);
++void PrintAddrinfo(FILE * f, struct addrinfo *ai);
++void PrintAddr(FILE * f, struct sockaddr *sa);
++
++#endif
+diff --git a/qemu-kvm-0.14.1/hw/msg/sendrcv.c b/qemu-kvm-0.14.1/hw/msg/sendrcv.c
+new file mode 100644
+index 0000000..90aa491
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/sendrcv.c
+@@ -0,0 +1,162 @@
++#ifdef _WIN32
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#include <stdlib.h>
++#include <stdio.h>
++
++#pragma comment (lib, "Ws2_32.lib")
++#pragma comment (lib, "Mswsock.lib")
++#pragma comment (lib, "AdvApi32.lib")
++
++typedef unsigned short uint16_t;
++
++#else
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <errno.h>
++#include <string.h>
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <netinet/in.h>
++#include <netdb.h>
++#include <arpa/inet.h>
++#include <sys/wait.h>
++#include <signal.h>
++
++//typedef int SOCKET;
++#define FALSE 0
++#define TRUE 1
++#endif
++
++#include "message.h"
++
++int bIsServer = 0;
++
++#define OPTRC_FILE "tinymsg.optrc"
++
++#define PORT "9752"
++#define MAGIC 0x6A38937
++#define MAX_MSGSIZE 1024
++
++void ProcessArgs(int argc, char **argv)
++{
++	int i;
++	for (i=1;i<argc;i++)
++	{
++		if (argv[i][0] == '-') {
++			switch(tolower(argv[i][1]))
++			{
++			case 's':
++				bIsServer = (~0);
++				break;
++			}
++		}
++	}
++}
++
++
++int main(int argc, char** argv) {
++  int socket;
++  
++  int rc;
++  uint16_t msg_size = MAX_MSGSIZE;
++
++  char buffer[MAX_MSGSIZE + 1];
++  char msg[MAX_MSGSIZE + 1];
++  
++  // This is added for testing
++  int buffSize = 0;
++  int flags = 0;
++  char *filename = argv[2];
++  FILE *file = fopen(filename, "r");
++  //End
++  
++  ProcessArgs(argc, argv);
++  memset(buffer, 0, MAX_MSGSIZE + 1);
++  memset(msg, 0, MAX_MSGSIZE + 1);
++  
++  
++
++  
++  if (bIsServer) {
++  
++    socket = announce(OPTRC_FILE);
++    if (socket == INVALID_SOCKET) {
++      goto err;
++    }
++
++	rc = recvdata(socket, buffer, &msg_size);
++    if (rc == SOCKET_ERROR) {
++      goto err;
++    }
++	printf("**** RECEIVED ****\n");
++	printf("Content: %s \n", buffer);
++	printf("Size = %d \n", msg_size);
++  } else {
++  
++  // This is mainly added for testing
++	// first check if the file is specified, exit if there is no file specified
++	if(argc < 3){
++		fprintf(stderr, "Please Specify the file to read the data from \n");
++		printf("size of command line = %d \n", argc);
++		exit(1);
++	}
++	
++	
++	
++	if( file != NULL){
++		while(fgets(msg, MAX_MSGSIZE, file)){
++			// Set the buffer size
++			if(argc == 3){
++				// the size of the file is not given, we have to calculate the size ourself
++				buffSize = strlen(msg);
++				// gonna send this msg
++            	// This if just for confirmation test
++			}
++			else{
++				// buffer size is given as part of the command line argument
++				//buffSize = (int) argv[2]; // Check this again to make sure I'm getting the right argument
++				char *fileSize = argv[3];
++				char s[5];
++				FILE *fileS = fopen(fileSize, "r");
++				if(fileS != NULL){
++					while(fgets(s, 5, fileS)){
++						buffSize = atoi(s);
++					}
++				}
++			}
++			
++		}
++			
++	}
++	else{
++		fprintf(stderr, "Input file is NULL");
++		return 3;
++	}
++	
++	
++	// End for testing
++    socket = locate(OPTRC_FILE);
++    if (socket == INVALID_SOCKET) {
++      goto err;
++    }
++			
++	rc = senddata(socket, msg, buffSize);
++    if (rc == SOCKET_ERROR) {
++      goto err;
++    }
++    printf("**** SENT ****\n");
++    printf("Content: %s \n", msg);
++	printf("Size = %d \n", buffSize);
++  }
++ 
++  close(socket);
++  return 0;
++
++ err:
++  close(socket);
++  return -1;
++}
+diff --git a/qemu-kvm-0.14.1/hw/msg/sockerr.c b/qemu-kvm-0.14.1/hw/msg/sockerr.c
+new file mode 100644
+index 0000000..edb41f4
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/sockerr.c
+@@ -0,0 +1,31 @@
++/* 
++    sockerr -- Simplifies log output for string-based errors.
++*/
++
++/*
++    Copyright (C) 2011 Jacob Keller, All rights reserved
++
++    The code in this file is licensed under GPL v2. This license does not 
++    extend to any file bundled with this one.
++*/
++
++#include "sockerr.h"
++
++void set_error(int err)
++{
++#ifdef _WIN32
++    WSASetLastError(err);
++#else
++    errno = err;
++#endif
++}
++
++const char *sock_error(void)
++{
++    int errval = errno;
++#ifdef _WIN32
++    return wsa_strerror(WSAGetLastError());
++#else
++    return strerror(errval);
++#endif
++}
+diff --git a/qemu-kvm-0.14.1/hw/msg/sockerr.h b/qemu-kvm-0.14.1/hw/msg/sockerr.h
+new file mode 100644
+index 0000000..2f31f68
+--- /dev/null
++++ b/qemu-kvm-0.14.1/hw/msg/sockerr.h
+@@ -0,0 +1,29 @@
++/* 
++    sockerr -- Simplifies log output for string-based errors.
++*/
++
++/*
++    Copyright (C) 2011 Jacob Keller, All rights reserved
++
++    The code in this file is licensed under GPL v2. This license does not 
++    extend to any file bundled with this one.
++*/
++
++#ifndef _SOCKERR_H
++#define _SOCKERR_H
++
++#ifdef _cplusplus
++extern "C" {
++#endif
++
++#include <errno.h>
++#include <string.h>
++#include "wsa_strerror.h"
++
++    void set_error(int err);
++    const char *sock_error(void);
++
++#ifdef _cplusplus
++}
++#endif
++#endif
+diff --git a/qemu-kvm-0.14.1/roms/seabios/Makefile b/qemu-kvm-0.14.1/roms/seabios/Makefile
+deleted file mode 120000
+index 3d92652..0000000
+--- a/qemu-kvm-0.14.1/roms/seabios/Makefile
++++ /dev/null
+@@ -1 +0,0 @@
+-/u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/roms/seabios/Makefile
+\ No newline at end of file
+diff --git a/qemu-kvm-0.14.1/roms/seabios/config.mak b/qemu-kvm-0.14.1/roms/seabios/config.mak
+deleted file mode 100644
+index 40cd215..0000000
+--- a/qemu-kvm-0.14.1/roms/seabios/config.mak
++++ /dev/null
+@@ -1,8 +0,0 @@
+-# Automatically generated by configure - do not modify
+-SRC_PATH=/u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/roms/seabios
+-CC=gcc
+-BCC=bcc
+-CPP=cpp
+-OBJCOPY=objcopy
+-IASL=iasl
+-LD=ld
+diff --git a/qemu-kvm-0.14.1/roms/vgabios/Makefile b/qemu-kvm-0.14.1/roms/vgabios/Makefile
+deleted file mode 120000
+index 4416176..0000000
+--- a/qemu-kvm-0.14.1/roms/vgabios/Makefile
++++ /dev/null
+@@ -1 +0,0 @@
+-/u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/roms/vgabios/Makefile
+\ No newline at end of file
+diff --git a/qemu-kvm-0.14.1/roms/vgabios/config.mak b/qemu-kvm-0.14.1/roms/vgabios/config.mak
+deleted file mode 100644
+index e736b1a..0000000
+--- a/qemu-kvm-0.14.1/roms/vgabios/config.mak
++++ /dev/null
+@@ -1,8 +0,0 @@
+-# Automatically generated by configure - do not modify
+-SRC_PATH=/u/jkeller/git/VirtualFirmware/qemu-kvm-0.14.1/roms/vgabios
+-CC=gcc
+-BCC=bcc
+-CPP=cpp
+-OBJCOPY=objcopy
+-IASL=iasl
+-LD=ld

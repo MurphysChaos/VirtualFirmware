@@ -20,14 +20,7 @@
 
 #include <WinSock2.h>
 
-#ifdef _cplusplus
-extern "C" {
-#endif
+const char *wsa_strerror(int e);
 
-    const char *wsa_strerror(int e);
-
-#ifdef _cplusplus
-}
-#endif
 #endif
 #endif

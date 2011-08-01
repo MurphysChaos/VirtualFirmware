@@ -9,17 +9,23 @@
     extend to any file bundled with this one.
 */
 
-#ifndef _SOCKERR_H
-#define _SOCKERR_H
+#include "sockerr.h"
 
-#include <errno.h>
-#include <string.h>
-
+void set_error(int err)
+{
 #ifdef _WIN32
-#include "wsa_strerror.h"
+    WSASetLastError(err);
+#else
+    errno = err;
 #endif
+}
 
-void set_error(int err);
-const char *sock_error(void);
-
+const char *sock_error(void)
+{
+    int errval = errno;
+#ifdef _WIN32
+    return wsa_strerror(WSAGetLastError());
+#else
+    return strerror(errval);
 #endif
+}

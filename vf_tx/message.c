@@ -302,7 +302,7 @@ SOCKET announce(const char *optrc)
             }
         }
 
-        dbg(DBG_WARN, "Sent announce msg %d to %s\n", count,
+        dbg(DBG_VERB, "Sent announce msg %d to %s\n", count,
             FormatAddr(&(ifp[0].hs->sp_dest), addr, NI_MAXHOST));
 
         FD_ZERO(&readfds);

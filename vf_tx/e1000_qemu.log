@@ -1,0 +1,127 @@
+Sun Jul 31 18:25:35 2011: Logging started.
+Sun Jul 31 18:28:47 2011: e1000_set_atq_tail: command 0x01
+Sun Jul 31 18:28:47 2011: e1000_send_aq_cmd: command 0x01
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: recv_desc
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: flags=57345
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: opcode=1
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: datalen=0
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: cookie_high=0
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: cookie_low=1
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: param0=1245236
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: param1=11469050
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: addr_high=0
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: addr_low=0
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: message_length=32
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: expected size=32
+Sun Jul 31 18:28:48 2011: e1000_set_atq_tail: command 0x01
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: command 0x01
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: recv_desc
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: flags=57345
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: opcode=1
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: datalen=0
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: cookie_high=0
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: cookie_low=1
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: param0=1245236
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: param1=11469050
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: addr_high=0
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: addr_low=0
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: message_length=32
+Sun Jul 31 18:28:48 2011: e1000_send_aq_cmd: expected size=32
+Sun Jul 31 18:29:08 2011: e1000_set_atq_tail: command 0x01
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: command 0x01
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: recv_desc
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: flags=57345
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: opcode=1
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: datalen=0
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: cookie_high=0
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: cookie_low=2
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: param0=1245236
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: param1=11469050
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: addr_high=0
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: addr_low=0
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: message_length=32
+Sun Jul 31 18:29:08 2011: e1000_send_aq_cmd: expected size=32
+Sun Jul 31 18:29:12 2011: e1000_set_atq_tail: command 0x03
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: command 0x03
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: recv_desc
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: flags=57345
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: opcode=3
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: datalen=1024
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: cookie_high=0
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: cookie_low=3
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: param0=0
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: param1=0
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: addr_high=0
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: addr_low=2004914176
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: message_length=1024
+Sun Jul 31 18:29:12 2011: e1000_send_aq_cmd: expected size=32
+Sun Jul 31 18:29:14 2011: e1000_set_atq_tail: command 0x01
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: command 0x01
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: recv_desc
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: flags=57345
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: opcode=1
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: datalen=0
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: cookie_high=0
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: cookie_low=4
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: param0=1245236
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: param1=11469050
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: addr_high=0
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: addr_low=0
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: message_length=32
+Sun Jul 31 18:29:14 2011: e1000_send_aq_cmd: expected size=32
+Sun Jul 31 18:29:18 2011: e1000_set_atq_tail: command 0x03
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: command 0x03
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: recv_desc
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: flags=57345
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: opcode=3
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: datalen=1024
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: cookie_high=0
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: cookie_low=5
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: param0=0
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: param1=0
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: addr_high=0
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: addr_low=2004905984
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: message_length=1024
+Sun Jul 31 18:29:18 2011: e1000_send_aq_cmd: expected size=32
+Sun Jul 31 18:29:20 2011: e1000_set_atq_tail: command 0x01
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: command 0x01
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: recv_desc
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: flags=57345
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: opcode=1
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: datalen=0
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: cookie_high=0
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: cookie_low=6
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: param0=1245236
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: param1=11469050
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: addr_high=0
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: addr_low=0
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: message_length=32
+Sun Jul 31 18:29:20 2011: e1000_send_aq_cmd: expected size=32
+Sun Jul 31 18:29:22 2011: e1000_set_atq_tail: command 0x03
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: command 0x03
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: recv_desc
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: flags=57345
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: opcode=3
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: datalen=1024
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: cookie_high=0
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: cookie_low=7
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: param0=0
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: param1=0
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: addr_high=0
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: addr_low=2004897792
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: message_length=1024
+Sun Jul 31 18:29:22 2011: e1000_send_aq_cmd: expected size=32
+Sun Jul 31 18:29:24 2011: e1000_set_atq_tail: command 0x01
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: command 0x01
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: recv_desc
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: flags=57345
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: opcode=1
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: datalen=0
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: cookie_high=0
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: cookie_low=8
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: param0=1245236
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: param1=11469050
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: addr_high=0
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: addr_low=0
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: message_length=32
+Sun Jul 31 18:29:24 2011: e1000_send_aq_cmd: expected size=32

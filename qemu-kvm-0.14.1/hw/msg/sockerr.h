@@ -12,18 +12,14 @@
 #ifndef _SOCKERR_H
 #define _SOCKERR_H
 
-#ifdef _cplusplus
-extern "C" {
-#endif
-
 #include <errno.h>
 #include <string.h>
+
+#ifdef _WIN32
 #include "wsa_strerror.h"
-
-    void set_error(int err);
-    const char *sock_error(void);
-
-#ifdef _cplusplus
-}
 #endif
+
+void set_error(int err);
+const char *sock_error(void);
+
 #endif

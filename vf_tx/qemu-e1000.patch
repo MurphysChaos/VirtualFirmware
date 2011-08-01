@@ -2308,7 +2308,7 @@ new file mode 100644
 index 0000000..2f31f68
 --- /dev/null
 +++ b/qemu-kvm-0.14.1/hw/msg/sockerr.h
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,24 @@
 +/* 
 +    sockerr -- Simplifies log output for string-based errors.
 +*/
@@ -2323,20 +2323,15 @@ index 0000000..2f31f68
 +#ifndef _SOCKERR_H
 +#define _SOCKERR_H
 +
-+#ifdef _cplusplus
-+extern "C" {
-+#endif
-+
 +#include <errno.h>
 +#include <string.h>
++#ifdef _WIN32
 +#include "wsa_strerror.h"
-+
-+    void set_error(int err);
-+    const char *sock_error(void);
-+
-+#ifdef _cplusplus
-+}
 +#endif
++
++void set_error(int err);
++const char *sock_error(void);
++
 +#endif
 diff --git a/qemu-kvm-0.14.1/roms/seabios/Makefile b/qemu-kvm-0.14.1/roms/seabios/Makefile
 deleted file mode 120000

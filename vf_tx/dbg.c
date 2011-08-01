@@ -11,6 +11,8 @@
 
 #include "dbg.h"
 
+/* Output debug information
+ */
 void fdbg(FILE * f, int level, const char *msg, ...)
 {
     if (OPT.dbglvl >= level) {

@@ -487,6 +487,7 @@ void PrintAddrFamily(FILE * f, int af)
     }
 }
 
+/* Prints address protocol value */
 void PrintAddrProtocol(FILE * f, int proto)
 {
     switch (proto) {

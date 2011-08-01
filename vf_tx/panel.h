@@ -75,34 +75,116 @@ typedef struct socket_panel {
     uint16_t sp_zero;
 } SOCKET_PANEL, PANEL;
 
-/* Functions for creating socket panels. */
+/* == FUNCTIONS FOR CREATING SOCKET PANELS. */
+
+/* Used as a helper function to create the "pre-zeroed" panel.
+ */
 PANEL *CreateEmptyPanel(void);
+
+/* Creates a panel with only an active socket. Useful for most of your 
+ * socket-panel needs.
+ */
 PANEL *CreatePanel(int af, int type, int proto);
+
+/* Creates a panel that is pre-bound to an outgoing port. The contained 
+ * socket will listen on all active interfaces. Use CreatePanel() then 
+ * BindPanel() to listen on a specific interface.
+ */
 PANEL *CreateBoundPanel(const char *svc, int af, int type, int proto);
+
+/* To be called after an accept to insert a socket into a panel.
+ */
 PANEL *SocketToPanel(int s, struct sockaddr *addr);
+
+/* Nicely cleans up after an unused panel.
+ */
 void FreePanel(PANEL * p);
+
+/* Nicely delets panel information but leaves socket intact*/
 void DissociatePanel(PANEL * p);
+
+
 /* == UTILITY FUNCTIONS */
+
+/* Resolves a general address and service specifier into a net-standard 
+ * internet address and port. The service an be a generalized service 
+ * specifier (e.g. "http", "ftp", "smtp", etc.) or a specific port.
+ * Returns NULL on error. Use freeaddrinfo() on the return result after 
+ * you are done with it.
+ */
 struct addrinfo *ResolveAddr(const char *addr, const char *svc, int af,
                              int type, int proto);
+
 /* == MANIPULATOR FUNCTIONS */
+
+/* Causes a panel to bind to the stored bind address. Must be used on a 
+ * valid panel.
+ */
 int BindPanel(PANEL * p, const char *addr, const char *svc, int reuse);
+
+/* Aligns outgoing traffic for the panel. Must be used on a valid panel.
+ */
 int SetDestination(PANEL * p, const char *addr, const char *svc);
+
+/* Sets the socket option with the linger structure. This doesn't work in 
+ * Windows.
+ */
 int SetOptionLinger(PANEL * p, uint16_t opt_yesno, uint16_t opt_delay);
+
+/* Used to set any true or false option
+ */
 int SetOption(PANEL * p, int level, int option, int optval);
+
 /* -- Functions for multicasting */
+
+/* Make an existing panel into a multicast panel by joining the multicast group
+ * and setting the send interface. Uses p->sp_dest which must be set prior to 
+ * calling.
+ */
 int JoinMulticastGroup(PANEL * p, const char *ifaddr);
+
+/* Gracefully leave the multicast group.
+ */
 int LeaveMulticastGroup(PANEL * p, const char *ifaddr);
+
+/* Override the default interface to send multicast messages from. If this 
+ * is not called, the system default is used.
+ */
 int SetMulticastSendInterface(PANEL * p, struct sockaddr *addr);
+
+/* Set the time-to-live (TTL) value for a multicast panel.
+ */
 int SetMulticastTTL(PANEL * p, int ttl);
+
+/* Sets whether multicast packets, sent by a given interface, are processed by 
+ * the originating host. Loopback is on by default.
+ */
 int SetMulticastLoopback(PANEL * p, int loopval);
+
 /* == Debugging functions */
 /* -- Fuctions for getting human-readable values on sockets. */
+
+/* Turns an address into presentation format. The return value is the pointer
+ * to buf.
+ */
 char *FormatAddr(struct sockaddr *sa, char *buf, int buflen);
+
+/* Print information on an entire panel.
+ */
 void PrintPanel(FILE * f, PANEL * p);
+
+/* Prints address family value */
 void PrintAddrFamily(FILE * f, int af);
+
+/* Prints address protocol value */
 void PrintAddrProtocol(FILE * f, int proto);
+
+/* Print all addresses in an Addrinfo linked list.
+ */
 void PrintAddrinfo(FILE * f, struct addrinfo *ai);
+
+/* Print information on an address.
+ */
 void PrintAddr(FILE * f, struct sockaddr *sa);
 
 #endif

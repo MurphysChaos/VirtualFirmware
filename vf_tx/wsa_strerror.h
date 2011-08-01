@@ -20,6 +20,8 @@
 
 #include <WinSock2.h>
 
+/* Return error message
+ */
 const char *wsa_strerror(int e);
 
 #endif

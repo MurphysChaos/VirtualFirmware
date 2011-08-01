@@ -23,6 +23,9 @@
 const char *default_file = OPTRC;
 struct options OPT = { MULTICAST_ADDR, MULTICAST_PORT, MAGIC_NUMBER, TCP_PORT, CONNECT_TIMEOUT, DBGLVL, 0 };
 
+/* Read in neccessary information and put
+ * them in the "options" structure
+ */
 void ReadOptions(const char *filename)
 {
     FILE *f = NULL;

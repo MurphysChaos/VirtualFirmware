@@ -26,6 +26,8 @@
 #define dbg(level, msg, ...) \
     fdbg(stderr, level, msg, ##__VA_ARGS__);
 
+/* Output debug information
+ */
 void fdbg(FILE * f, int level, const char *msg, ...);
 
 

@@ -44,8 +44,7 @@ typedef int SOCKET;
 #include "opt.h"
 #include "dbg.h"
 
-/*
- * anounce()
+/* anounce()
  * 
  * the announce function will multicast a message
  * announcing this functions service via a unique
@@ -55,8 +54,7 @@ typedef int SOCKET;
  */
 SOCKET announce(const char *optrc);
 
-/*
- * locate()
+/* locate()
  * 
  * the locate function will listen for incoming announcement messages
  * and will connect to the first valid server
@@ -65,8 +63,7 @@ SOCKET announce(const char *optrc);
  */
 SOCKET locate(const char *optrc);
 
-/*
- * senddata()
+/* senddata()
  * 
  * this function will send a message of raw bytes of a certain length
  * across the socket, by first sending the length in a fixed value
@@ -74,8 +71,7 @@ SOCKET locate(const char *optrc);
  */
 int senddata(SOCKET socket, void *data, uint16_t length);
 
-/*
- * recvdata()
+/* recvdata()
  *
  * this function will receive a message from the socket
  * and put its value into the buffer. It will return an

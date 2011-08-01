@@ -48,6 +48,9 @@ int buildIfPanel(IF_PANEL * p, IF_DATA * i);
 int populateInterfaceData(IF_DATA * if_d, int *numIfs);
 uint32_t chksum(uint8_t * data, uint16_t length);
 
+
+/* Fill the IF_PANEL structure
+ */
 int buildIfPanel(IF_PANEL * p, IF_DATA * i)
 {
     int rc = 0;
@@ -97,6 +100,8 @@ int buildIfPanel(IF_PANEL * p, IF_DATA * i)
     return 0;
 }
 
+/* Fill the IF_DATA structure
+ */
 int populateInterfaceData(IF_DATA * if_d, int *numIfs)
 {
 #ifdef _WIN32
@@ -234,6 +239,14 @@ int populateInterfaceData(IF_DATA * if_d, int *numIfs)
 #endif
 }
 
+/* anounce()
+ * 
+ * the announce function will multicast a message
+ * announcing this functions service via a unique
+ * magic number.
+ *
+ * Returns a socket
+ */
 #define MAX_IF_LENGTH 32
 SOCKET announce(const char *optrc)
 {
@@ -367,6 +380,13 @@ SOCKET announce(const char *optrc)
     return INVALID_SOCKET;
 }
 
+/* locate()
+ * 
+ * the locate function will listen for incoming announcement messages
+ * and will connect to the first valid server
+ * 
+ * Returns a socket
+ */
 SOCKET locate(const char *optrc)
 {
     PANEL *hs = NULL;
@@ -525,6 +545,12 @@ uint32_t chksum(uint8_t * data, uint16_t length)
     return sum;
 }
 
+/* senddata()
+ * 
+ * this function will send a message of raw bytes of a certain length
+ * across the socket, by first sending the length in a fixed value
+ * "header", then sending the buffer.
+ */
 int senddata(SOCKET socket, void *data, uint16_t length)
 {
     int rc = 0;
@@ -559,6 +585,16 @@ int senddata(SOCKET socket, void *data, uint16_t length)
     return rc;
 }
 
+/* recvdata()
+ *
+ * this function will receive a message from the socket
+ * and put its value into the buffer. It will return an
+ * error code if the given buffer is not large enough to hold
+ * all of the data
+ *
+ * it will modify the length value to be the actual
+ * length of the message returned.
+ */
 int recvdata(SOCKET socket, void *data, uint16_t * length)
 {
     int rc = 0;

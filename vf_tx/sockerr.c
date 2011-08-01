@@ -11,6 +11,8 @@
 
 #include "sockerr.h"
 
+/* Set error value
+ */
 void set_error(int err)
 {
 #ifdef _WIN32
@@ -20,6 +22,8 @@ void set_error(int err)
 #endif
 }
 
+/* Return error message
+ */
 const char *sock_error(void)
 {
     int errval = errno;

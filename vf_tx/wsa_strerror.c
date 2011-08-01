@@ -20,7 +20,7 @@
 
 /* Returns the Microsoft-specified description of a particular winsock
  * error.
- * * * */
+ */
 const char *wsa_strerror(int e)
 {
     switch (e) {

@@ -19,7 +19,12 @@
 #include "wsa_strerror.h"
 #endif
 
+/* Set error value
+ */
 void set_error(int err);
+
+/* Return error message
+ */
 const char *sock_error(void);
 
 #endif

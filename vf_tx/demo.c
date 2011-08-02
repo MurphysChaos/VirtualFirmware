@@ -2,7 +2,7 @@
 
 int bIsServer = 0;
 
-#define OPTRC_FILE "tinymsg.optrc"
+#define OPTRC_FILE "demo.optrc"
 #define MAX_MSGSIZE 1024
 
 void ProcessArgs(int argc, char **argv)

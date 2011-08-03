@@ -1,37 +1,60 @@
 Virtual Firmware API for Pre-Silicon Driver Development
-Published under the GNU Public License v2.
+
+Copyright (c) 2011 Kabiru Ahmed, Ahmed Bohliqa, Jacob Keller, 
+                   Joel Murphy, Cuong Nguyen
+
+Permission is hereby granted, free of charge, to any person obtaining a 
+copy of this software and associated documentation files (the 
+"Software"), to deal in the Software without restriction, including 
+without limitation the rights to use, copy, modify, merge, publish, 
+distribute, sublicense, and/or sell copies of the Software, and to 
+permit persons to whom the Software is furnished to do so, subject to 
+the following conditions: 
+
+The above copyright notice and this permission notice shall be included 
+in all copies or substantial portions of the Software. 
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS 
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. 
+
 
 About the Project 
 ================= 
 
-Virtual Firmware (hereafter referred to as "the Project") is a project, in
-cooperation with Intel Corporation, under the Software Engineering Capstone
-program at Portland State University.  Its purpose is to build a set of
-tools for simulating a hardware environment to allow driver developers to
-test their drivers without "working silicon."
+Virtual Firmware (hereafter referred to as "the Project") is a project, 
+in cooperation with Intel Corporation, under the Software Engineering 
+Capstone program at Portland State University. Its purpose is to build a 
+set of tools for simulating a hardware environment to allow driver 
+developers to test their drivers without "working silicon." 
 
-The particular project with Intel involves communicating between a driver
-and a firmware.
+The particular project with Intel involves communicating between a 
+driver and a firmware. 
 
 
 Components of the Project
 =========================
 
-We are working with QEMU-KVM to create two running virtual machines. On the
-first virtual machine (VM) is an emulator running the ThreadX RTOS with a
-proprietary firmware created by Intel (this component is not available on
-the public domain).  The second VM is running Fedora 14 Linux with a
-modified Intel e1000 driver and virtual hardware component.
+We are working with QEMU-KVM to create two running virtual machines. On 
+the first virtual machine (VM) is an emulator running the ThreadX RTOS 
+with a proprietary firmware created by Intel (this component is not 
+available on the public domain). The second VM is running Fedora 14 
+Linux with a modified Intel e1000 driver and virtual hardware component. 
 
-Between the two VMs is a sockets library, allowing for metacommunication
-between the driver and firmware, outside the normal communications chain for
-QEMU networking.
+Between the two VMs is a sockets library, allowing for metacommunication 
+between the driver and firmware, outside the normal communications chain 
+for QEMU networking. 
 
 
 Requirements
 ============
-This API was developed using Express Logic ThreadX RTOS. The following files 
-protected under a proprietary license and must be supplied by the developer:
+This API was developed using Express Logic ThreadX RTOS. The following 
+files protected under a proprietary license and must be supplied by the 
+developer: 
 
 tx.lib
 tx_api.h
@@ -44,17 +67,18 @@ should be put in the vf_tx folder.
 About the Software Engineering Capstone
 =======================================
 
-Portland State University (PSU) operates non-traditional requirements for
-the general education requirements of an accredited university. Part of that
-requirement is a "Senior Capstone" where the members of a team work with the
-community on a significant project. Numerous capstones, representing varied
-disciplines, exist, one of which is a Software Engineering capstone.
+Portland State University (PSU) operates non-traditional requirements 
+for the general education requirements of an accredited university. Part 
+of that requirement is a "Senior Capstone" where the members of a team 
+work with the community on a significant project. Numerous capstones, 
+representing varied disciplines, exist, one of which is a Software 
+Engineering capstone. 
 
-The Software Engineering capstone takes the form of building a software
-product with a team for sponsors in the local area. The overall project is
-meant to approximate the working conditions of working for a "customer,"
-gathering requirements, building a specification, research, design, coding,
-distribution, etc.
+The Software Engineering capstone takes the form of building a software 
+product with a team for sponsors in the local area. The overall project 
+is meant to approximate the working conditions of working for a 
+"customer," gathering requirements, building a specification, research, 
+design, coding, distribution, etc. 
 
 
 Members of the Project Team

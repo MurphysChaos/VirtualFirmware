@@ -11,10 +11,25 @@
 */
 
 /*
-    Copyright (C) 2011 Jacob Keller, All rights reserved
+    Copyright (c) 2011 Jacob Keller
 
-    The code in this file is licensed under GPL v2. This license does not 
-    extend to any file bundled with this one.
+    Permission is hereby granted, free of charge, to any person obtaining a 
+    copy of this software and associated documentation files (the "Software"), 
+    to deal in the Software without restriction, including without limitation 
+    the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+    and/or sell copies of the Software, and to permit persons to whom the 
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in 
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL 
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+    DEALINGS IN THE SOFTWARE.
 */
 
 #include "message.h"
@@ -48,6 +63,9 @@ int buildIfPanel(IF_PANEL * p, IF_DATA * i);
 int populateInterfaceData(IF_DATA * if_d, int *numIfs);
 uint32_t chksum(uint8_t * data, uint16_t length);
 
+
+/* Fill the IF_PANEL structure
+ */
 int buildIfPanel(IF_PANEL * p, IF_DATA * i)
 {
     int rc = 0;
@@ -97,6 +115,8 @@ int buildIfPanel(IF_PANEL * p, IF_DATA * i)
     return 0;
 }
 
+/* Fill the IF_DATA structure
+ */
 int populateInterfaceData(IF_DATA * if_d, int *numIfs)
 {
 #ifdef _WIN32
@@ -234,6 +254,14 @@ int populateInterfaceData(IF_DATA * if_d, int *numIfs)
 #endif
 }
 
+/* anounce()
+ * 
+ * the announce function will multicast a message
+ * announcing this functions service via a unique
+ * magic number.
+ *
+ * Returns a socket
+ */
 #define MAX_IF_LENGTH 32
 SOCKET announce(const char *optrc)
 {
@@ -367,6 +395,13 @@ SOCKET announce(const char *optrc)
     return INVALID_SOCKET;
 }
 
+/* locate()
+ * 
+ * the locate function will listen for incoming announcement messages
+ * and will connect to the first valid server
+ * 
+ * Returns a socket
+ */
 SOCKET locate(const char *optrc)
 {
     PANEL *hs = NULL;
@@ -525,6 +560,12 @@ uint32_t chksum(uint8_t * data, uint16_t length)
     return sum;
 }
 
+/* senddata()
+ * 
+ * this function will send a message of raw bytes of a certain length
+ * across the socket, by first sending the length in a fixed value
+ * "header", then sending the buffer.
+ */
 int senddata(SOCKET socket, void *data, uint16_t length)
 {
     int rc = 0;
@@ -559,6 +600,16 @@ int senddata(SOCKET socket, void *data, uint16_t length)
     return rc;
 }
 
+/* recvdata()
+ *
+ * this function will receive a message from the socket
+ * and put its value into the buffer. It will return an
+ * error code if the given buffer is not large enough to hold
+ * all of the data
+ *
+ * it will modify the length value to be the actual
+ * length of the message returned.
+ */
 int recvdata(SOCKET socket, void *data, uint16_t * length)
 {
     int rc = 0;
